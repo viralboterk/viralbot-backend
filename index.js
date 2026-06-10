@@ -25,11 +25,11 @@ app.use((req, res, next) => {
 // TIKTOK DOMAIN VERIFICATION
 // =====================
 app.get('/tiktok-site-verification', (req, res) => {
-  res.send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
+  res.send('tiktok-developers-site-verification=VYFb5YJKJVo8yY0IOW4rhPFZqFw5QZBk');
 });
 
 app.get('/.well-known/tiktok-site-verification', (req, res) => {
-  res.send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
+  res.send('tiktok-developers-site-verification=VYFb5YJKJVo8yY0IOW4rhPFZqFw5QZBk');
 });
 
 // =====================
