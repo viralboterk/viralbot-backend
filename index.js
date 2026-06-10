@@ -47,6 +47,10 @@ app.get('/.well-known/tiktok-site-verification.txt', (req, res) => {
 // API ROUTES
 // =====================
 
+app.get('/tiktok-developers-site-verification.txt', (req, res) => {
+  res.type('text/plain').send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
+});
+
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', version: '1.0.0', timestamp: new Date().toISOString() });
 });
