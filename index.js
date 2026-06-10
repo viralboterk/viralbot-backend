@@ -89,6 +89,30 @@ app.get('/.well-known/tiktok-site-verification.txt', (req, res) => {
   res.type('text/plain').send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
 });
 
+
+
+// =====================
+// TIKTOK DOMAIN VERIFICATION — 3 URLs
+// =====================
+
+// 1. Web/Desktop URL: https://viralbot-backend-production.up.railway.app
+// TikTok checks: /tiktokeM7Hxpz9Fu27SQUseqTtmmoJipyslPko.txt
+app.get('/tiktokeM7Hxpz9Fu27SQUseqTtmmoJipyslPko.txt', (req, res) => {
+  res.type('text/plain').send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
+});
+
+// 2. Terms URL: https://viralbot-backend-production.up.railway.app/terms
+// TikTok checks: /terms/tiktoktVSrL4owGEeF5xkkuwe3L9NGt6wwG57o.txt
+app.get('/terms/tiktoktVSrL4owGEeF5xkkuwe3L9NGt6wwG57o.txt', (req, res) => {
+  res.type('text/plain').send('tiktok-developers-site-verification=tVSrL4owGEeF5xkkuwe3L9NGt6wwG57o');
+});
+
+// 3. Privacy URL: https://viralbot-backend-production.up.railway.app/privacy
+// TikTok checks: /privacy/tiktokHPEyP82J2tRXQBfFlktcfNVOs0tCWX64.txt
+app.get('/privacy/tiktoktHPEyP82J2tRXQBfFlktcfNVOs0tCWX64.txt', (req, res) => {
+  res.type('text/plain').send('tiktok-developers-site-verification=HPEyP82J2tRXQBfFlktcfNVOs0tCWX64');
+});
+
 // =====================
 // API ROUTES
 // =====================
