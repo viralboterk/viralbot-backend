@@ -27,6 +27,52 @@ app.get('/.well-known/tiktok-site-verification', (req, res) => {
 });
 
 
+
+// Terms and Privacy pages
+app.get('/terms', (req, res) => {
+  res.type('text/html').send(`<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>ViralBot — Terms of Service</title>
+<style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:20px;color:#1a1035}h1{color:#7c3aed}</style>
+</head>
+<body>
+<h1>Terms of Service — ViralBot</h1>
+<p>Last updated: June 2025</p>
+<h2>1. Acceptance</h2>
+<p>By using ViralBot, you agree to these terms. ViralBot is an automated content management tool that identifies viral YouTube Shorts and republishes them on TikTok creator accounts for entertainment purposes.</p>
+<h2>2. Use of Service</h2>
+<p>ViralBot is intended for use by content creators who own and manage TikTok accounts. You are responsible for ensuring that all content published complies with TikTok's Community Guidelines and Terms of Service.</p>
+<h2>3. Content</h2>
+<p>ViralBot only republishes publicly available content from YouTube. We respect intellectual property rights and remove content upon valid copyright claims.</p>
+<h2>4. Limitation of Liability</h2>
+<p>ViralBot is provided as-is without warranties. We are not liable for any damages arising from the use of this service.</p>
+<h2>5. Contact</h2>
+<p>For any questions: kamel.elrhazi@gmail.com</p>
+</body></html>`);
+});
+
+app.get('/privacy', (req, res) => {
+  res.type('text/html').send(`<!DOCTYPE html>
+<html>
+<head><meta charset="UTF-8"><title>ViralBot — Privacy Policy</title>
+<style>body{font-family:sans-serif;max-width:800px;margin:40px auto;padding:20px;color:#1a1035}h1{color:#7c3aed}</style>
+</head>
+<body>
+<h1>Privacy Policy — ViralBot</h1>
+<p>Last updated: June 2025</p>
+<h2>1. Data We Collect</h2>
+<p>ViralBot collects only the TikTok account handles and OAuth tokens necessary to publish content on your behalf. We do not collect personal data from TikTok viewers or end users.</p>
+<h2>2. How We Use Data</h2>
+<p>TikTok account credentials are stored securely and used exclusively to publish automated content. They are never shared with third parties.</p>
+<h2>3. Data Security</h2>
+<p>All data is stored securely on Railway servers. We comply with GDPR regulations and applicable data protection laws.</p>
+<h2>4. Third Party Services</h2>
+<p>ViralBot uses the TikTok API and YouTube Data API. Please refer to their respective privacy policies for information on how they handle data.</p>
+<h2>5. Contact</h2>
+<p>For privacy concerns: kamel.elrhazi@gmail.com</p>
+</body></html>`);
+});
+
 // =====================
 // TIKTOK DOMAIN VERIFICATION
 // =====================
