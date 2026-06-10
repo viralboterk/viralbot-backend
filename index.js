@@ -22,14 +22,25 @@ app.use((req, res, next) => {
 });
 
 // =====================
+app.get('/.well-known/tiktok-site-verification', (req, res) => {
+  res.send('tiktok-developers-site-verification=VYFb5YJKJVo8yY0IOW4rhPFZqFw5QZBk');
+});
+
+
+// =====================
 // TIKTOK DOMAIN VERIFICATION
 // =====================
 app.get('/tiktok-site-verification', (req, res) => {
-  res.send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
+  res.type('text/plain').send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
 });
-
+app.get('/tiktok-site-verification.txt', (req, res) => {
+  res.type('text/plain').send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
+});
 app.get('/.well-known/tiktok-site-verification', (req, res) => {
-  res.send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
+  res.type('text/plain').send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
+});
+app.get('/.well-known/tiktok-site-verification.txt', (req, res) => {
+  res.type('text/plain').send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
 });
 
 // =====================
