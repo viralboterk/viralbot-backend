@@ -9,7 +9,7 @@ const CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET;
 // Generate OAuth URL for account connection
 function getOAuthUrl(accountHandle) {
   const appUrl = process.env.APP_URL || 'https://viralbot-backend-production.up.railway.app';
-  const redirectUri = encodeURIComponent(appUrl + '/callback');
+  const redirectUri = encodeURIComponent(appUrl + '/callback/');
   const scope = encodeURIComponent('video.upload,video.publish,user.info.basic');
   const state = encodeURIComponent(accountHandle);
   return 'https://www.tiktok.com/v2/auth/authorize/?client_key=' + CLIENT_KEY + '&scope=' + scope + '&response_type=code&redirect_uri=' + redirectUri + '&state=' + state;
