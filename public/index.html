@@ -449,7 +449,7 @@ select option{background:var(--bg2)}
           <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--purple)">10 Comptes TikTok</div>
           <div style="font-size:12px;color:var(--text2);margin-top:3px">Sélectionne une catégorie sur chaque compte · 48 vidéos/jour · 1 vidéo toutes les 20 min</div>
         </div>
-        <button class="btn btn-primary" onclick="notify('Connecte la clé API TikTok dans Config d\'abord','warn')">+ Ajouter un compte</button>
+        <button class="btn btn-primary" onclick="openAddModal()">+ Ajouter un compte</button>
       </div>
       <div class="alert alert-purple" style="margin-bottom:16px"><span>🗂️</span><span>Clique sur une catégorie pour l'assigner à un compte. L'application diffusera uniquement les vidéos de cette catégorie sur ce compte.</span></div>
       <div class="acc-grid" id="accounts-grid"></div>
@@ -887,7 +887,7 @@ function renderAccounts(){
       </div>
 
       ${a.status==='warn'?`<button class="btn btn-danger btn-sm" style="width:100%;margin-top:10px" onclick="notify('Compte suspendu. File en pause.','warn')">⚠️ Gérer le strike</button>`:''}
-      ${a.status==='pending'?`<button class="btn btn-primary btn-sm" style="width:100%;margin-top:10px" onclick="notify('Connecte la clé API TikTok dans Config','warn')">+ Connecter l\'API</button>`:''}
+      ${a.status==='pending'?`<button class="btn btn-primary btn-sm" style="width:100%;margin-top:10px" onclick="connectTikTok(a.handle)">🔗 Connecter TikTok</button>`:''}
     </div>`;
   }).join('');
 }
