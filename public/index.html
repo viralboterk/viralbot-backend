@@ -966,11 +966,11 @@ function initStrikes(){
 function initConfig(){
   document.getElementById('apis-list').innerHTML=[
     {n:'YouTube Data API v3',i:'▶️',s:'ok',d:'Clé API configurée — scanning actif',col:'var(--green)'},
-    {n:'TikTok Content Posting API',i:'🎵',s:'missing',d:'Phase 2 — en attente approbation',col:'var(--yellow)'},
+    {n:'TikTok Content Posting API',i:'🎵',s:'ok',d:'API approuvée ✅ — connexion comptes OAuth',col:'var(--green)'},
     {n:'Instagram Graph API',i:'📸',s:'later',d:'Phase 3 — non démarré',col:'var(--text3)'},
     {n:'Twitch API Helix',i:'🎮',s:'later',d:'Phase 3 — non démarré',col:'var(--text3)'},
     {n:'Kick API',i:'🟢',s:'later',d:'Phase 3 — non démarré',col:'var(--text3)'},
-    {n:'Cloudflare R2',i:'☁️',s:'missing',d:'Stockage vidéos — à configurer',col:'var(--yellow)'},
+    {n:'Cloudflare R2',i:'☁️',s:'ok',d:'Bucket viral-videos configuré ✓',col:'var(--green)'},
   ].map(a=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:19px">${a.i}</span><div style="flex:1"><div style="font-size:13px;font-weight:600">${a.n}</div><div style="font-size:11px;color:var(--text2)">${a.d}</div></div><span class="badge ${a.s==='ok'?'b-green':a.s==='missing'?'b-yellow':'b-gray'}">${a.s==='ok'?'✅ Connectée':a.s==='missing'?'⚠️ À configurer':'⏳ Plus tard'}</span></div>`).join('');
   document.getElementById('config-params').innerHTML=`
     <div class="alert alert-yt" style="margin-bottom:14px"><span>▶️</span><span><strong>Phase 1 — YouTube uniquement</strong><br>Clé API : AIzaSyDIQS...q4s8RAE ✅</span></div>
