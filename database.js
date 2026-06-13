@@ -74,6 +74,24 @@ async function initDb() {
       scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP
     );
 
+    
+    CREATE TABLE IF NOT EXISTS scanned_videos (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      video_id TEXT NOT NULL,
+      category TEXT NOT NULL,
+      mix_type TEXT NOT NULL,
+      title TEXT,
+      channel TEXT,
+      views INTEGER DEFAULT 0,
+      likes INTEGER DEFAULT 0,
+      comments INTEGER DEFAULT 0,
+      duration INTEGER DEFAULT 0,
+      score INTEGER DEFAULT 0,
+      thumbnail TEXT,
+      lang TEXT DEFAULT 'EN',
+      scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(video_id, category)
+    );
     CREATE TABLE IF NOT EXISTS system_stats (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       key TEXT UNIQUE,
@@ -181,7 +199,27 @@ const dbHelpers = {
     };
   },
 
-  // Raw helpers for API routes
+  
+  saveScannedVideos: (category, videos, mixType) => {
+    videos.forEach(function(v) {
+      try {
+        run('INSERT OR REPLACE INTO scanned_videos (video_id, category, mix_type, title, channel, views, likes, comments, duration, score, thumbnail, lang) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [v.id, category, mixType, v.title, v.channelTitle, v.views || 0, v.likes || 0, v.comments || 0, v.duration || 0, v.score || 0, v.thumbnail || '', v.lang || 'EN']);
+      } catch(e) {}
+    });
+  },
+
+  getScannedVideos: (category, mixType, limit) => {
+    let sql = 'SELECT * FROM scanned_videos WHERE 1=1';
+    const params = [];
+    if (category) { sql += ' AND category = ?'; params.push(category); }
+    if (mixType) { sql += ' AND mix_type = ?'; params.push(mixType); }
+    sql += ' ORDER BY score DESC, scanned_at DESC LIMIT ?';
+    params.push(limit || 240);
+    return all(sql, params);
+  },
+
+// Raw helpers for API routes
   all,
   get,
   run,

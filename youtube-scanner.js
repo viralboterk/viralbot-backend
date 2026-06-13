@@ -196,7 +196,12 @@ async function scanCategory(category, type = 'both') {
   const totalRejected = totalFound - totalSelected;
 
   dbHelpers.logScan(category, totalFound, totalSelected, totalRejected);
-  logger.info(`Category ${category}: ${totalSelected} selected (${recentFiltered.length} recent + ${evergreenFiltered.length} evergreen)`);
+  
+  // Save scanned videos to DB for display in Top 48
+  dbHelpers.saveScannedVideos(category, recentFiltered, 'recent');
+  dbHelpers.saveScannedVideos(category, evergreenFiltered, 'evergreen');
+  
+  logger.info('Category ' + category + ': ' + totalSelected + ' selected (' + recentFiltered.length + ' recent + ' + evergreenFiltered.length + ' evergreen)');
 
   return { recent: recentFiltered, evergreen: evergreenFiltered };
 }

@@ -1311,9 +1311,21 @@ function loadRealVideos() {
       VIDEOS.length = 0;
       var emojis = {movies:'🎬',stream:'🎮',sports:'⚽',divert:'🎉',others:'📦'};
       data.slice(0,48).forEach(function(item, i) {
-        VIDEOS.push({rank:i+1, cat:item.category||'others', title:item.title||'Vidéo en attente',
-          views:'—', shares:'—', comments:'—', score:85, safe:95, lang:'FR',
-          emoji:emojis[item.category]||'📦', dur:'60-90s', mix:item.mix_type||'recent'});
+        VIDEOS.push({
+          rank: i+1,
+          cat: item.category || 'others',
+          title: item.title || 'Vidéo en attente',
+          views: item.views ? item.views.toLocaleString() : '—',
+          shares: '—',
+          comments: item.comments ? item.comments.toLocaleString() : '—',
+          score: item.score || 85,
+          safe: 95,
+          lang: item.lang || 'EN',
+          emoji: emojis[item.category] || '📦',
+          dur: item.duration ? item.duration + 's' : '60-90s',
+          mix: item.mix_type || 'recent',
+          videoId: item.video_id,
+        });
       });
       addLog('success', data.length + ' vidéos chargées depuis Railway');
       if(document.getElementById('vid-list')) renderVideos();

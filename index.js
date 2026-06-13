@@ -277,17 +277,12 @@ app.delete(`/api/accounts/:handle`, (req, res) => {
 });
 
 
-// Get videos for Top 48 display (from queue)
+// Get videos for Top 48 display (from scanned_videos table)
 app.get('/api/videos', (req, res) => {
   try {
     const category = req.query.category || null;
     const mixType = req.query.mix || null;
-    let sql = 'SELECT * FROM video_queue WHERE status = "pending"';
-    const params = [];
-    if (category) { sql += ' AND category = ?'; params.push(category); }
-    if (mixType) { sql += ' AND mix_type = ?'; params.push(mixType); }
-    sql += ' ORDER BY created_at DESC LIMIT 240';
-    const videos = dbHelpers.all(sql, params);
+    const videos = dbHelpers.getScannedVideos(category, mixType, 240);
     res.json(videos);
   } catch (err) {
     res.status(500).json({ error: err.message });
