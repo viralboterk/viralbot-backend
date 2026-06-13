@@ -516,6 +516,7 @@ select option{background:var(--bg2)}
       <div class="tt-meta-title">📊 Détails</div>
       <div id="tt-meta-rows"></div>
       <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+        <button class="btn" style="width:100%;margin-bottom:8px" id="yt-link-btn" onclick="if(ttVids[ttIdx]&&ttVids[ttIdx].videoId)window.open('https://www.youtube.com/shorts/'+ttVids[ttIdx].videoId,'_blank');else notify('Vidéo YouTube non disponible','warn')">▶ Voir sur YouTube</button>
         <button class="btn btn-primary" style="width:100%" onclick="notify('Édition IA lancée !','info');closeTT()">✨ Éditer avec l'IA</button>
         <button class="btn" style="width:100%" onclick="notify('Vidéo retirée du Top 48','warn');closeTT()">🗑 Retirer du Top 48</button>
       </div>
@@ -537,20 +538,7 @@ const CATS = [
 ];
 
 // ===== DATA =====
-const VIDEOS = [
-  {rank:1,cat:'divert',title:'POV : tu rencontres un speedrunner dans la rue',views:'12,4M',shares:'340K',comments:'89K',score:98,safe:99,lang:'FR',emoji:'🎮',dur:'75s',mix:'recent'},
-  {rank:2,cat:'divert',title:'Ce chien a l\'air humain quand il marche',views:'9,8M',shares:'210K',comments:'145K',score:95,safe:97,lang:'FR',emoji:'🐕',dur:'68s',mix:'recent'},
-  {rank:3,cat:'sports',title:'Messi nutmeg impossible — 1er essai',views:'8,1M',shares:'180K',comments:'62K',score:93,safe:95,lang:'EN',emoji:'⚽',dur:'82s',mix:'ever'},
-  {rank:4,cat:'divert',title:'Magie de rue qui rend tout le monde fou',views:'7,7M',shares:'165K',comments:'201K',score:91,safe:98,lang:'FR',emoji:'🪄',dur:'65s',mix:'recent'},
-  {rank:5,cat:'stream',title:'Ce gamin de 12 ans bat des pros sur ce jeu',views:'6,9M',shares:'140K',comments:'77K',score:89,safe:96,lang:'FR',emoji:'🎯',dur:'88s',mix:'recent'},
-  {rank:6,cat:'stream',title:'Gotaga — 40 kills solo Warzone en 3 minutes',views:'6,4M',shares:'130K',comments:'43K',score:87,safe:99,lang:'FR',emoji:'🏆',dur:'60s',mix:'ever'},
-  {rank:7,cat:'sports',title:'Tir à 3 points les yeux bandés — 1er essai',views:'5,9M',shares:'120K',comments:'38K',score:85,safe:94,lang:'EN',emoji:'🏀',dur:'72s',mix:'ever'},
-  {rank:8,cat:'divert',title:'Ce chat comprend le français mieux que toi',views:'5,2M',shares:'108K',comments:'55K',score:83,safe:99,lang:'FR',emoji:'🐱',dur:'61s',mix:'recent'},
-  {rank:9,cat:'movies',title:'Cette scène de film était RÉELLE — incroyable',views:'4,8M',shares:'92K',comments:'31K',score:81,safe:97,lang:'FR',emoji:'🎬',dur:'79s',mix:'ever'},
-  {rank:10,cat:'others',title:'Invention qui va changer ta vie quotidienne',views:'3,9M',shares:'71K',comments:'44K',score:77,safe:96,lang:'FR',emoji:'💡',dur:'85s',mix:'recent'},
-  {rank:11,cat:'movies',title:'La scène la plus intense de toute l\'histoire du cinéma',views:'3,7M',shares:'68K',comments:'91K',score:75,safe:98,lang:'EN',emoji:'🍿',dur:'63s',mix:'ever'},
-  {rank:12,cat:'sports',title:'Skateur fait un trick jamais vu en compétition',views:'3,2M',shares:'58K',comments:'29K',score:73,safe:93,lang:'EN',emoji:'🛹',dur:'78s',mix:'recent'},
-];
+const VIDEOS = []; // Loaded from Railway via /api/queue
 
 const ACCOUNTS = []; // Loaded from Railway on startup
 
@@ -846,7 +834,7 @@ async function genAI(){
   document.getElementById('ai-result').innerHTML='';
   document.getElementById('ai-lang').innerHTML='';
   try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1000,messages:[{role:'user',content:`Tu es un expert en contenu viral TikTok spécialisé dans la catégorie "${cat?.label}". Génère du contenu pour ce YouTube Short :\nTitre : "${v.title}"\nCatégorie : ${cat?.label} ${cat?.icon}\nType : ${v.mix==='recent'?'Vidéo récente (dernières 24h)':'Vidéo evergreen (top 6 ans)'}\nVues : ${v.views} | Durée : ${v.dur}\nLangue : ${lf==='FR'?'Français':'Anglais'} | Ton : ${tl}\nRéponds UNIQUEMENT en JSON valide :\n{"titre":"(max 80 chars, catchy et adapté à la catégorie ${cat?.label})","description":"2-3 phrases : qui, où, quoi — ${tl}","hashtags":["tag1",...20 tags sans # adaptés à ${cat?.label}],"langue":"${lf}","emotion":"émotion dominante","hook":"accroche 2 premières secondes max 15 mots"}`}]})});
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:`Tu es un expert en contenu viral TikTok spécialisé dans la catégorie "${cat?.label}". Génère du contenu pour ce YouTube Short :\nTitre : "${v.title}"\nCatégorie : ${cat?.label} ${cat?.icon}\nType : ${v.mix==='recent'?'Vidéo récente (dernières 24h)':'Vidéo evergreen (top 6 ans)'}\nVues : ${v.views} | Durée : ${v.dur}\nLangue : ${lf==='FR'?'Français':'Anglais'} | Ton : ${tl}\nRéponds UNIQUEMENT en JSON valide :\n{"titre":"(max 80 chars, catchy et adapté à la catégorie ${cat?.label})","description":"2-3 phrases : qui, où, quoi — ${tl}","hashtags":["tag1",...20 tags sans # adaptés à ${cat?.label}],"langue":"${lf}","emotion":"émotion dominante","hook":"accroche 2 premières secondes max 15 mots"}`}]})});
     const data=await res.json();
     const json=JSON.parse(data.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim());
     document.getElementById('ai-lang').innerHTML=`<span class="badge b-purple">${json.langue} · ${json.emotion}</span>`;
@@ -994,9 +982,19 @@ function renderTT(){
   const v=ttVids[ttIdx];if(!v)return;
   const cat=getCat(v.cat);
   const el=document.getElementById('tt-emoji');
-  el.textContent=v.emoji;
-  el.style.background=`linear-gradient(160deg,${cat?.light||'#f3eeff'} 0%,#f0ecff 100%)`;
-  el.style.fontSize='80px';
+  if (v.videoId) {
+    // Show real YouTube thumbnail
+    el.style.backgroundImage = 'url(https://img.youtube.com/vi/' + v.videoId + '/hqdefault.jpg)';
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = 'center';
+    el.style.fontSize = '0px';
+    el.textContent = '';
+  } else {
+    el.style.backgroundImage = 'none';
+    el.textContent = v.emoji;
+    el.style.background = (cat ? cat.light : '#f3eeff');
+    el.style.fontSize = '80px';
+  }
   document.getElementById('tt-caption').textContent=v.title;
   document.getElementById('tt-tags').textContent=`#viral #fyp #${cat?.id||'trending'} #youtube #${v.lang.toLowerCase()}`;
   document.getElementById('tt-likes').textContent=v.shares;
@@ -1059,7 +1057,9 @@ initConfig();
     </div>
   </div>
 </div>
-<script>
+<script>var RAILWAY_URL = window.location.origin;
+
+
 
 // ============================================================
 // RAILWAY BACKEND — Same origin, no CORS issues
@@ -1095,6 +1095,8 @@ function deleteAccount(handle) {
         notify('Compte ' + handle + ' supprime', 'warn');
         addLog('warn', 'Compte supprime : ' + handle);
         loadRealAccounts();
+    loadRealVideos();
+    loadRealLogs();
       } else {
         notify('Erreur suppression', 'err');
       }
@@ -1244,7 +1246,13 @@ renderAccounts = function() {
     var conBtn = document.createElement('button');
     conBtn.className = 'btn btn-primary btn-sm real-btn';
     conBtn.style.flex = '1';
-    conBtn.textContent = a.connected ? '🔄 Reconnecter' : '🔗 Connecter TikTok';
+    conBtn.textContent = a.connected ? '✅ Connecté' : '🔗 Connecter TikTok';
+    if (a.connected) {
+      conBtn.className = 'btn btn-sm real-btn';
+      conBtn.style.background = 'var(--green-l)';
+      conBtn.style.color = 'var(--green)';
+      conBtn.style.border = '1px solid rgba(5,150,105,0.3)';
+    }
     conBtn.onclick = (function(h){ return function(){ connectTikTok(h); }; })(a.handle);
 
     // Delete button
@@ -1291,6 +1299,41 @@ window.addEventListener('load', function() {
   setInterval(syncStatus, 30000);
 });
 
+
+// ===== REAL DATA FROM RAILWAY =====
+function loadRealVideos() {
+  fetch(RAILWAY_URL + '/api/queue')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data || !data.length) { addLog('info', 'File vide — lance un scan YouTube'); return; }
+      VIDEOS.length = 0;
+      var emojis = {movies:'🎬',stream:'🎮',sports:'⚽',divert:'🎉',others:'📦'};
+      data.slice(0,48).forEach(function(item, i) {
+        VIDEOS.push({rank:i+1, cat:item.category||'others', title:item.title||'Vidéo en attente',
+          views:'—', shares:'—', comments:'—', score:85, safe:95, lang:'FR',
+          emoji:emojis[item.category]||'📦', dur:'60-90s', mix:item.mix_type||'recent'});
+      });
+      addLog('success', data.length + ' vidéos chargées depuis Railway');
+      if(document.getElementById('vid-list')) renderVideos();
+    }).catch(function() { addLog('warn', 'Impossible de charger les vidéos'); });
+}
+
+function loadRealLogs() {
+  fetch(RAILWAY_URL + '/api/logs')
+    .then(function(r) { return r.json(); })
+    .then(function(logs) {
+      if (!logs || !logs.length) return;
+      var logEl = document.getElementById('pipe-log');
+      if (!logEl) return;
+      logEl.innerHTML = logs.map(function(l) {
+        return '<div>[' + new Date(l.scanned_at).toLocaleTimeString('fr-FR') + '] > Scan ' +
+          l.category + ' : ' + l.videos_found + ' trouvées, ' + l.videos_selected + ' sélectionnées</div>';
+      }).join('');
+      logEl.scrollTop = logEl.scrollHeight;
+    }).catch(function() {});
+}
+
+setInterval(function() { loadRealVideos(); loadRealLogs(); }, 60000);
 </script>
 </body>
 </html>
