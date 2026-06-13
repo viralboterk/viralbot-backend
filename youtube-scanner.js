@@ -127,13 +127,14 @@ function detectLanguage(text) {
   return 'EN'; // Default to English for international content
 }
 
-// Filter videos by duration (60-90 seconds)
-function filterByDuration(videos) {
-  return videos.filter(v => v.duration >= 60 && v.duration <= 90);
+// Filter single video by duration (60-90 seconds)
+function filterByDuration(video) {
+  return video.duration >= 60 && video.duration <= 90;
 }
 
 // Copyright safety check (basic heuristics)
 function copyrightSafetyCheck(video) {
+  if (!video || !video.channelTitle || !video.title) return false;
   const riskyChannels = [
     'vevo', 'universal music', 'warner', 'sony music', 'umg', 'disney',
     'official music video', 'records', 'entertainment official',
@@ -161,7 +162,7 @@ async function scanCategory(category, type = 'both') {
     for (const query of queries.slice(0, 3)) {
       const ids = await searchShorts(query, 15, yesterday);
       const details = await getVideoDetails(ids);
-      results.recent.push(...details);
+      if (Array.isArray(details)) results.recent.push(...details);
       await sleep(300); // Rate limit protection
     }
   }
@@ -172,15 +173,16 @@ async function scanCategory(category, type = 'both') {
     for (const query of queries.slice(3)) {
       const ids = await searchShorts(query, 15, sixYearsAgo);
       const details = await getVideoDetails(ids);
-      results.evergreen.push(...details);
+      if (Array.isArray(details)) results.evergreen.push(...details);
       await sleep(300);
     }
   }
 
   // Filter and sort
   const filterAndSort = (videos) => {
+    if (!Array.isArray(videos)) return [];
     return videos
-      .filter(v => filterByDuration(v) && copyrightSafetyCheck(v))
+      .filter(v => v && filterByDuration(v) && copyrightSafetyCheck(v))
       .sort((a, b) => b.score - a.score)
       .reduce((acc, v) => { // Deduplicate
         if (!acc.find(x => x.id === v.id)) acc.push(v);
