@@ -3,7 +3,6 @@ const { dbHelpers, initDb } = require('./database');
 const { scanAllCategories } = require('./youtube-scanner');
 const { downloadAndUploadToR2, deleteFromR2 } = require('./video-downloader');
 const { generateContent } = require('./ai-editor');
-const { uploadVideoToR2, deleteFromR2 } = require('./r2-storage');
 const { publishVideo } = require('./tiktok-publisher');
 const logger = require('./logger');
 
