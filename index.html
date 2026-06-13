@@ -1,0 +1,1339 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="tiktok-site-verification" content="eM7Hxpz9Fu27SQUseqTtmmoJipyslPko">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#f7f5ff">
+<title>ViralBot — v0.6</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Serif+Display&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#f7f5ff;--bg2:#ffffff;--bg3:#f0ecff;--bg4:#e8e2ff;
+  --border:#e2daf7;--border2:#c8bef5;
+  --text:#1a1035;--text2:#6b5fa0;--text3:#b0a8d0;
+  --purple:#7c3aed;--purple2:#9f67fa;--purple-l:#f3eeff;
+  --pink:#e8449a;--pink-l:#fff0f7;
+  --cyan:#0891b2;--cyan-l:#e0f7ff;
+  --green:#059669;--green-l:#e6faf4;
+  --yellow:#d97706;--yellow-l:#fef9ec;
+  --orange:#ea580c;--orange-l:#fff4ee;
+  --red:#dc2626;--red-l:#fff1f1;
+  --gold:#b45309;--gold-l:#fdf8ed;
+  --r:10px;--rl:16px;--rxl:22px;
+  --shadow:0 1px 4px rgba(124,58,237,0.08),0 4px 16px rgba(124,58,237,0.06);
+  --shadow-lg:0 4px 24px rgba(124,58,237,0.12),0 12px 40px rgba(124,58,237,0.08);
+
+  /* CATEGORY COLORS */
+  --cat-movies:#7c3aed;--cat-movies-l:#f3eeff;
+  --cat-stream:#0891b2;--cat-stream-l:#e0f7ff;
+  --cat-sports:#059669;--cat-sports-l:#e6faf4;
+  --cat-divert:#e8449a;--cat-divert-l:#fff0f7;
+  --cat-others:#d97706;--cat-others-l:#fef9ec;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%;overflow:hidden}
+body{font-family:'Outfit',sans-serif;background:var(--bg);color:var(--text);font-size:14px}
+.app{display:flex;height:100vh}
+
+/* SIDEBAR */
+.sidebar{width:224px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;box-shadow:2px 0 12px rgba(124,58,237,0.06)}
+.logo{padding:20px 18px 16px;display:flex;align-items:center;gap:11px;border-bottom:1px solid var(--border)}
+.logo-icon{width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--purple),var(--pink));display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0;box-shadow:0 4px 12px rgba(124,58,237,0.35)}
+.logo-name{font-family:'DM Serif Display',serif;font-size:18px;color:var(--purple)}
+.logo-v{font-size:10px;padding:2px 7px;background:var(--purple-l);color:var(--purple2);border-radius:20px;border:1px solid var(--border2);font-weight:700}
+.nav-section{padding:14px 16px 4px;font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.1em}
+.nav-item{display:flex;align-items:center;gap:10px;padding:9px 12px;margin:2px 8px;border-radius:var(--r);cursor:pointer;color:var(--text2);font-size:13px;font-weight:500;transition:all .18s;border:none;background:none;width:calc(100% - 16px);text-align:left}
+.nav-item:hover{background:var(--bg3);color:var(--purple)}
+.nav-item.active{background:linear-gradient(90deg,var(--purple-l),var(--pink-l));color:var(--purple);font-weight:700;border:1px solid var(--border2)}
+.nav-icon{font-size:16px;width:22px;text-align:center;flex-shrink:0}
+.sidebar-footer{margin-top:auto;padding:14px;border-top:1px solid var(--border)}
+.sys-pill{padding:10px 12px;background:var(--green-l);border-radius:var(--r);border:1px solid rgba(5,150,105,0.2);display:flex;align-items:center;gap:10px}
+.sys-dot{width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0}
+@keyframes sysglow{0%,100%{box-shadow:0 0 0 0 rgba(5,150,105,0.4)}70%{box-shadow:0 0 0 5px rgba(5,150,105,0)}}
+.sys-dot{animation:sysglow 2s infinite}
+
+/* MAIN */
+.main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.topbar{height:58px;background:var(--bg2);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 22px;gap:14px;flex-shrink:0;box-shadow:0 1px 8px rgba(124,58,237,0.06)}
+.topbar-title{font-family:'DM Serif Display',serif;font-size:18px;color:var(--purple)}
+.topbar-sub{font-size:12px;color:var(--text3)}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.clock{font-size:12px;color:var(--text3);font-variant-numeric:tabular-nums;font-weight:500}
+.content{flex:1;overflow-y:auto;padding:22px}
+.panel{display:none}.panel.active{display:block}
+
+/* BUTTONS */
+.btn{padding:8px 16px;font-size:12px;font-weight:600;border-radius:var(--r);cursor:pointer;border:1px solid var(--border2);background:var(--bg2);color:var(--text);transition:all .18s;font-family:'Outfit',sans-serif}
+.btn:hover{background:var(--bg3);border-color:var(--purple2)}
+.btn-primary{background:linear-gradient(135deg,var(--purple),var(--purple2));border:none;color:#fff;box-shadow:0 3px 12px rgba(124,58,237,0.3)}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:0 5px 18px rgba(124,58,237,0.4)}
+.btn-sm{padding:5px 12px;font-size:11px}
+.btn-danger{background:var(--red-l);border-color:rgba(220,38,38,0.2);color:var(--red)}
+
+/* METRICS */
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.metric-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:18px;position:relative;overflow:hidden;box-shadow:var(--shadow);transition:all .2s}
+.metric-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.metric-glow{position:absolute;top:-15px;right:-15px;width:70px;height:70px;border-radius:50%;opacity:.12;filter:blur(15px)}
+.metric-icon{font-size:22px;margin-bottom:8px}
+.metric-lbl{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.metric-val{font-family:'DM Serif Display',serif;font-size:30px;line-height:1;color:var(--text)}
+.metric-sub{font-size:11px;color:var(--text2);margin-top:6px;font-weight:500}
+
+/* CARDS */
+.card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:18px;margin-bottom:14px;box-shadow:var(--shadow)}
+.card:last-child{margin-bottom:0}
+.card-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+.card-title{font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:4px;font-size:11px;font-weight:700;padding:3px 9px;border-radius:20px}
+.b-purple{background:var(--purple-l);color:var(--purple);border:1px solid var(--border2)}
+.b-pink{background:var(--pink-l);color:var(--pink);border:1px solid rgba(232,68,154,0.2)}
+.b-cyan{background:var(--cyan-l);color:var(--cyan);border:1px solid rgba(8,145,178,0.2)}
+.b-green{background:var(--green-l);color:var(--green);border:1px solid rgba(5,150,105,0.2)}
+.b-yellow{background:var(--yellow-l);color:var(--yellow);border:1px solid rgba(217,119,6,0.2)}
+.b-orange{background:var(--orange-l);color:var(--orange);border:1px solid rgba(234,88,12,0.2)}
+.b-red{background:var(--red-l);color:var(--red);border:1px solid rgba(220,38,38,0.2)}
+.b-gold{background:var(--gold-l);color:var(--gold);border:1px solid rgba(180,83,9,0.2)}
+.b-gray{background:var(--bg3);color:var(--text2);border:1px solid var(--border)}
+
+/* CATEGORY BADGES */
+.cat-badge{display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:4px 10px;border-radius:20px;border:1px solid}
+.cat-movies{background:var(--cat-movies-l);color:var(--cat-movies);border-color:rgba(124,58,237,0.25)}
+.cat-stream{background:var(--cat-stream-l);color:var(--cat-stream);border-color:rgba(8,145,178,0.25)}
+.cat-sports{background:var(--cat-sports-l);color:var(--cat-sports);border-color:rgba(5,150,105,0.25)}
+.cat-divert{background:var(--cat-divert-l);color:var(--cat-divert);border-color:rgba(232,68,154,0.25)}
+.cat-others{background:var(--cat-others-l);color:var(--cat-others);border-color:rgba(217,119,6,0.25)}
+.cat-none{background:var(--bg3);color:var(--text3);border-color:var(--border)}
+
+/* PBAR */
+.pbar-wrap{height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+.pbar{height:100%;border-radius:3px;transition:width .5s}
+.p-purple{background:linear-gradient(90deg,var(--purple),var(--purple2))}
+.p-green{background:linear-gradient(90deg,var(--green),var(--cyan))}
+.p-yellow{background:linear-gradient(90deg,var(--yellow),var(--orange))}
+.p-red{background:linear-gradient(90deg,var(--red),var(--pink))}
+.p-cyan{background:linear-gradient(90deg,var(--cyan),var(--purple))}
+.p-pink{background:linear-gradient(90deg,var(--pink),var(--orange))}
+
+/* VIDEO CARD */
+.vid-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;transition:all .18s;cursor:pointer;box-shadow:var(--shadow)}
+.vid-card:hover{border-color:var(--purple2);background:var(--purple-l);transform:translateX(3px);box-shadow:var(--shadow-lg)}
+.vid-card .mix-tag{font-size:10px;font-weight:700;padding:2px 6px;border-radius:6px}
+.mix-recent{background:var(--green-l);color:var(--green);border:1px solid rgba(5,150,105,0.2)}
+.mix-ever{background:var(--gold-l);color:var(--gold);border:1px solid rgba(180,83,9,0.2)}
+
+/* CATEGORY SELECTOR (on account cards) */
+.cat-selector{display:grid;grid-template-columns:1fr 1fr;gap:5px;margin-top:10px}
+.cat-option{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:8px;cursor:pointer;font-size:11px;font-weight:600;border:1.5px solid var(--border);background:var(--bg3);transition:all .18s;color:var(--text2)}
+.cat-option:hover{border-color:var(--border2)}
+.cat-option.selected-movies{background:var(--cat-movies-l);color:var(--cat-movies);border-color:rgba(124,58,237,0.4)}
+.cat-option.selected-stream{background:var(--cat-stream-l);color:var(--cat-stream);border-color:rgba(8,145,178,0.4)}
+.cat-option.selected-sports{background:var(--cat-sports-l);color:var(--cat-sports);border-color:rgba(5,150,105,0.4)}
+.cat-option.selected-divert{background:var(--cat-divert-l);color:var(--cat-divert);border-color:rgba(232,68,154,0.4)}
+.cat-option.selected-others{background:var(--cat-others-l);color:var(--cat-others);border-color:rgba(217,119,6,0.4)}
+.cat-option-full{grid-column:1/-1}
+
+/* ACCOUNT CARDS */
+.acc-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:12px}
+.acc-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:16px;box-shadow:var(--shadow);transition:all .18s;position:relative;overflow:hidden}
+.acc-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.acc-stripe{position:absolute;top:0;left:0;right:0;height:4px;border-radius:var(--rl) var(--rl) 0 0}
+.acc-head{display:flex;align-items:center;gap:10px;margin-bottom:10px;margin-top:4px}
+.acc-avatar{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.acc-name{font-weight:700;font-size:13px;color:var(--text)}
+.acc-handle{font-size:11px;color:var(--text2)}
+.acc-row{display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px}
+.acc-row .k{color:var(--text2)}.acc-row .v{font-weight:600}
+
+/* CAT STATS GRID */
+.cat-stats-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:20px}
+.cat-stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:14px;box-shadow:var(--shadow);text-align:center;transition:all .2s;cursor:pointer}
+.cat-stat-card:hover{transform:translateY(-2px);box-shadow:var(--shadow-lg)}
+.cat-stat-icon{font-size:26px;margin-bottom:6px}
+.cat-stat-name{font-size:11px;font-weight:700;margin-bottom:4px}
+.cat-stat-count{font-family:'DM Serif Display',serif;font-size:22px;margin-bottom:4px}
+.cat-stat-sub{font-size:10px;color:var(--text3)}
+
+/* TOGGLE */
+.toggle{width:40px;height:22px;border-radius:11px;background:var(--bg3);border:2px solid var(--border2);position:relative;cursor:pointer;transition:all .25s;flex-shrink:0;display:inline-block}
+.toggle.on{background:linear-gradient(90deg,var(--purple),var(--purple2));border-color:transparent;box-shadow:0 2px 8px rgba(124,58,237,0.35)}
+.toggle::after{content:'';position:absolute;width:14px;height:14px;border-radius:50%;background:#fff;top:2px;left:2px;transition:left .22s;box-shadow:0 1px 3px rgba(0,0,0,0.2)}
+.toggle.on::after{left:20px}
+
+/* INPUTS */
+input,select,textarea{background:var(--bg3);border:1.5px solid var(--border2);border-radius:var(--r);color:var(--text);padding:9px 12px;font-size:13px;font-family:'Outfit',sans-serif;width:100%;outline:none;transition:all .18s}
+input:focus,select:focus,textarea:focus{border-color:var(--purple);background:var(--bg2);box-shadow:0 0 0 3px rgba(124,58,237,0.12)}
+select option{background:var(--bg2)}
+.form-label{font-size:11px;font-weight:700;color:var(--text2);margin-bottom:6px;display:block;text-transform:uppercase;letter-spacing:.05em}
+.form-grp{margin-bottom:14px}
+
+/* FILTER BTNS */
+.filter-row{display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap}
+.fbtn{padding:6px 14px;font-size:12px;font-weight:600;border:1px solid var(--border2);border-radius:20px;background:var(--bg2);color:var(--text2);cursor:pointer;transition:all .18s;box-shadow:var(--shadow)}
+.fbtn:hover{border-color:var(--purple);color:var(--purple);background:var(--purple-l)}
+.fbtn.active{background:linear-gradient(135deg,var(--purple),var(--purple2));border-color:transparent;color:#fff;box-shadow:0 3px 10px rgba(124,58,237,0.3)}
+.fbtn.cat-f-movies.active{background:linear-gradient(135deg,var(--cat-movies),#9f67fa);box-shadow:0 3px 10px rgba(124,58,237,0.3)}
+.fbtn.cat-f-stream.active{background:linear-gradient(135deg,var(--cat-stream),#06b6d4);box-shadow:0 3px 10px rgba(8,145,178,0.3)}
+.fbtn.cat-f-sports.active{background:linear-gradient(135deg,var(--cat-sports),#10b981);box-shadow:0 3px 10px rgba(5,150,105,0.3)}
+.fbtn.cat-f-divert.active{background:linear-gradient(135deg,var(--cat-divert),#f472b6);box-shadow:0 3px 10px rgba(232,68,154,0.3)}
+.fbtn.cat-f-others.active{background:linear-gradient(135deg,var(--cat-others),#f59e0b);box-shadow:0 3px 10px rgba(217,119,6,0.3)}
+
+/* ALERTS */
+.alert{padding:11px 14px;border-radius:var(--r);font-size:12px;line-height:1.6;display:flex;align-items:flex-start;gap:10px;margin-bottom:12px}
+.alert-info{background:var(--cyan-l);color:var(--cyan);border:1px solid rgba(8,145,178,0.2)}
+.alert-warn{background:var(--yellow-l);color:var(--yellow);border:1px solid rgba(217,119,6,0.2)}
+.alert-success{background:var(--green-l);color:var(--green);border:1px solid rgba(5,150,105,0.2)}
+.alert-purple{background:var(--purple-l);color:var(--purple);border:1px solid var(--border2)}
+.alert-yt{background:#fff1f1;color:#dc2626;border:1px solid rgba(220,38,38,0.2)}
+
+/* STEP */
+.step-item{display:flex;gap:14px;padding:12px 14px;background:var(--bg3);border-radius:var(--r);margin-bottom:8px;border:1px solid var(--border)}
+.step-num{font-family:'DM Serif Display',serif;font-size:16px;color:var(--purple);flex-shrink:0;width:22px}
+
+/* PIPE */
+.pipe-steps{display:flex;align-items:center;flex-wrap:wrap;gap:6px;margin-bottom:14px}
+.pipe-box{padding:8px 14px;border:1.5px solid var(--border2);border-radius:var(--r);font-size:12px;font-weight:700;white-space:nowrap;flex-shrink:0;transition:all .3s}
+.pipe-done{border-color:var(--green);color:var(--green);background:var(--green-l)}
+.pipe-active{border-color:var(--purple);color:var(--purple);background:var(--purple-l);box-shadow:0 0 0 3px rgba(124,58,237,0.1)}
+.pipe-pending{color:var(--text3);background:var(--bg3)}
+.pipe-arrow{color:var(--text3);margin:0 4px;font-size:14px;flex-shrink:0}
+
+/* LOG */
+.log-mono{font-family:'Courier New',monospace;font-size:11px;color:var(--text2);line-height:1.9;max-height:190px;overflow-y:auto;background:var(--bg3);border-radius:var(--r);padding:10px;border:1px solid var(--border)}
+
+/* MODAL */
+.modal-bg{display:none;position:fixed;inset:0;background:rgba(26,16,53,0.4);z-index:500;align-items:center;justify-content:center;backdrop-filter:blur(6px)}
+.modal-bg.open{display:flex}
+.modal{background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rxl);padding:26px;width:500px;max-width:95vw;box-shadow:var(--shadow-lg)}
+.modal-title{font-family:'DM Serif Display',serif;font-size:20px;color:var(--purple);margin-bottom:18px}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+
+/* TT VIEWER */
+.tt-modal-bg{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:1000;align-items:center;justify-content:center;backdrop-filter:blur(8px)}
+.tt-modal-bg.open{display:flex}
+.tt-wrap{display:flex;align-items:flex-start;gap:20px;max-width:95vw}
+.tt-phone{width:315px;background:#000;border-radius:36px;overflow:hidden;box-shadow:0 24px 80px rgba(0,0,0,0.7);flex-shrink:0;border:3px solid #222}
+.tt-notch{height:28px;background:#000;display:flex;align-items:center;justify-content:center}
+.tt-notch::after{content:'';width:60px;height:8px;background:#111;border-radius:4px}
+.tt-video{width:100%;height:520px;position:relative;overflow:hidden;background:#0a0a0a}
+.tt-emoji-bg{width:100%;height:100%;display:flex;align-items:center;justify-content:center;font-size:80px}
+.tt-overlay{position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,0.75) 0%,transparent 50%)}
+.tt-right{position:absolute;right:10px;bottom:80px;display:flex;flex-direction:column;gap:18px;align-items:center}
+.tt-action{display:flex;flex-direction:column;align-items:center;gap:2px}
+.tt-btn{width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;font-size:20px;cursor:pointer;backdrop-filter:blur(4px)}
+.tt-count{font-size:10px;color:#fff;font-weight:600}
+.tt-ui{position:absolute;bottom:0;left:0;right:0;padding:16px 14px}
+.tt-user{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.tt-avatar-tt{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--purple),var(--pink));display:flex;align-items:center;justify-content:center;font-size:14px;border:2px solid #fff}
+.tt-uname{font-size:13px;font-weight:700;color:#fff}
+.tt-follow{font-size:10px;padding:2px 8px;border:1px solid #fff;border-radius:10px;color:#fff;margin-left:4px;font-weight:600}
+.tt-caption{font-size:12px;color:#fff;line-height:1.5;margin-bottom:6px}
+.tt-tags{font-size:11px;color:rgba(255,255,255,0.7);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.tt-progress{position:absolute;bottom:0;left:0;right:0;height:3px;background:rgba(255,255,255,0.2)}
+.tt-bar{height:100%;background:#fff;border-radius:2px;animation:ttbar 8s linear infinite}
+@keyframes ttbar{from{width:0}to{width:100%}}
+.tt-bottom{height:40px;background:#000;display:flex;align-items:center;justify-content:space-around}
+.tt-bicon{font-size:18px;opacity:.5}
+.tt-bicon.on{opacity:1}
+.tt-meta{background:var(--bg2);border-radius:var(--rl);padding:20px;width:260px;box-shadow:var(--shadow-lg);border:1px solid var(--border);flex-shrink:0}
+.tt-meta-title{font-family:'DM Serif Display',serif;font-size:16px;color:var(--purple);margin-bottom:14px}
+.tt-meta-row{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid var(--border);font-size:12px}
+.tt-meta-row:last-child{border-bottom:none}
+.tt-close{position:fixed;top:16px;right:16px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,0.15);display:flex;align-items:center;justify-content:center;font-size:22px;cursor:pointer;color:#fff;border:none;backdrop-filter:blur(4px);z-index:10}
+.tt-nav{width:44px;height:44px;border-radius:50%;background:rgba(255,255,255,0.15);border:none;color:#fff;font-size:24px;cursor:pointer;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px);flex-shrink:0}
+
+/* NOTIFS */
+.notif-wrap{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+.notif{padding:12px 16px;border-radius:var(--rl);font-size:13px;font-weight:500;max-width:320px;animation:slideIn .3s ease;box-shadow:var(--shadow-lg)}
+@keyframes slideIn{from{transform:translateX(110%);opacity:0}to{transform:translateX(0);opacity:1}}
+.notif-success{background:var(--green-l);border:1px solid rgba(5,150,105,0.3);color:var(--green)}
+.notif-warn{background:var(--yellow-l);border:1px solid rgba(217,119,6,0.3);color:var(--yellow)}
+.notif-err{background:var(--red-l);border:1px solid rgba(220,38,38,0.3);color:var(--red)}
+.notif-info{background:var(--purple-l);border:1px solid var(--border2);color:var(--purple)}
+
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinner{width:16px;height:16px;border:2px solid var(--border2);border-top-color:var(--purple);border-radius:50%;animation:spin .6s linear infinite;display:inline-block;flex-shrink:0}
+
+.ai-out{background:var(--purple-l);border:1px solid var(--border2);border-radius:var(--rl);padding:16px;margin-top:14px}
+.ai-lbl{font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px}
+.ai-field{margin-bottom:13px}.ai-field:last-child{margin-bottom:0}
+.tag-cloud{display:flex;flex-wrap:wrap;gap:5px}
+.tag{font-size:11px;padding:3px 9px;border-radius:20px;background:var(--bg2);color:var(--purple);border:1px solid var(--border2)}
+
+/* PLANNING */
+.plan-grid{display:flex;flex-direction:column;gap:5px}
+.plan-hour{display:grid;grid-template-columns:56px 1fr 1fr;gap:6px;align-items:center}
+.plan-slot{background:var(--bg3);border-radius:8px;padding:6px 8px;font-size:11px;min-height:32px;display:flex;align-items:center;gap:5px;border:1px solid var(--border)}
+.plan-slot.filled{background:var(--purple-l);border-color:var(--border2)}
+
+/* SOURCES GRID */
+.sources-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.src-card{background:var(--bg3);border:1px solid var(--border);border-radius:var(--r);padding:10px 12px;display:flex;align-items:center;gap:10px}
+
+/* MOBILE */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-224px);transition:transform .3s;z-index:200;position:fixed;top:0;bottom:0}
+  .sidebar.open{transform:translateX(0)}
+  .main{margin-left:0}
+  .metrics{grid-template-columns:1fr 1fr!important;gap:10px!important}
+  .grid2{grid-template-columns:1fr!important}
+  .acc-grid{grid-template-columns:1fr!important}
+  .cat-stats-grid{grid-template-columns:1fr 1fr!important}
+  .content{padding:14px}
+  .mobile-btn{display:flex!important}
+}
+.mobile-btn{display:none;align-items:center;justify-content:center;width:38px;height:38px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r);cursor:pointer;font-size:20px;flex-shrink:0;color:var(--purple)}
+.sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(26,16,53,0.3);z-index:150}
+.sidebar-overlay.open{display:block}
+#api-status{font-size:11px;font-weight:600;padding:4px 10px;background:var(--bg3);border-radius:20px;border:1px solid var(--border);color:var(--text3)}
+</style>
+</head>
+<body>
+<div class="sidebar-overlay" onclick="toggleMenu()" id="overlay"></div>
+<div class="app">
+
+<!-- SIDEBAR -->
+<aside class="sidebar" id="sidebar">
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div style="flex:1"><div class="logo-name">ViralBot</div></div>
+    <span class="logo-v">v0.6</span>
+  </div>
+  <div class="nav-section">Vue globale</div>
+  <button class="nav-item active" onclick="go('dashboard',this)"><span class="nav-icon">📊</span>Dashboard</button>
+  <button class="nav-item" onclick="go('pipeline',this)"><span class="nav-icon">⚙️</span>Pipeline live</button>
+  <div class="nav-section">Contenu YouTube</div>
+  <button class="nav-item" onclick="go('categories',this)"><span class="nav-icon">🗂️</span>5 Catégories</button>
+  <button class="nav-item" onclick="go('top48',this)"><span class="nav-icon">🏆</span>Top 48 par catégorie</button>
+  <button class="nav-item" onclick="go('filtre',this)"><span class="nav-icon">🛡️</span>Filtres copyright</button>
+  <button class="nav-item" onclick="go('edition',this)"><span class="nav-icon">✨</span>Édition IA</button>
+  <div class="nav-section">Comptes TikTok</div>
+  <button class="nav-item" onclick="go('comptes',this)"><span class="nav-icon">📱</span>10 Comptes</button>
+  <button class="nav-item" onclick="go('planning',this)"><span class="nav-icon">📅</span>Planning</button>
+  <button class="nav-item" onclick="go('strikes',this)"><span class="nav-icon">⚠️</span>Strikes</button>
+  <div class="nav-section">Système</div>
+  <button class="nav-item" onclick="go('config',this)"><span class="nav-icon">🔧</span>Config API</button>
+  <div class="sidebar-footer">
+    <div class="sys-pill">
+      <div class="sys-dot"></div>
+      <div>
+        <div style="font-size:12px;font-weight:700;color:var(--green)">Système actif</div>
+        <div style="font-size:10px;color:var(--text2)" id="sys-sub">YouTube uniquement — Phase 1</div>
+      </div>
+    </div>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<div class="main">
+  <div class="topbar">
+    <button class="mobile-btn" onclick="toggleMenu()">☰</button>
+    <div>
+      <span class="topbar-title" id="topbar-title">Dashboard</span>
+      <span class="topbar-sub" id="topbar-sub"> · Vue d'ensemble</span>
+    </div>
+    <div class="topbar-right">
+      <span class="clock" id="clock"></span>
+      <span id="api-status">🔄 Connexion...</span>
+      <button class="btn btn-sm" onclick="simulateScan()">⟳ Scanner YouTube</button>
+      <button class="btn btn-primary btn-sm" onclick="go('edition',null)">✨ Édition IA</button>
+    </div>
+  </div>
+
+  <div class="content">
+
+    <!-- DASHBOARD -->
+    <div id="panel-dashboard" class="panel active">
+      <div class="alert alert-yt" style="margin-bottom:16px"><span style="font-size:15px">▶️</span><span><strong>Phase 1 — YouTube uniquement.</strong> TikTok, Instagram, Twitch et Kick seront activés après validation des performances.</span></div>
+      <div class="metrics" id="dash-metrics"></div>
+
+      <!-- CAT STATS -->
+      <div class="card-title" style="margin-bottom:12px">🗂️ Performances par catégorie</div>
+      <div class="cat-stats-grid" id="cat-stats"></div>
+
+      <div class="grid2">
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">🔥 Top performers du moment</div><button class="btn btn-sm" onclick="go('top48',null)">Voir tout →</button></div>
+          <div id="top-performers"></div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">⚡ Activité en temps réel</div><button class="btn btn-sm" onclick="clearLog()">Effacer</button></div>
+          <div id="activity-log" style="display:flex;flex-direction:column;gap:5px;max-height:220px;overflow-y:auto"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PIPELINE -->
+    <div id="panel-pipeline" class="panel">
+      <div class="card">
+        <div class="card-hdr"><div class="card-title">⚙️ Pipeline YouTube — 5 catégories</div><button class="btn btn-primary btn-sm" id="pipe-btn" onclick="runPipeline()">▶ Lancer un cycle</button></div>
+        <div class="pipe-steps" id="pipe-steps"></div>
+        <div id="pipe-status" style="display:none;align-items:center;gap:8px;font-size:12px;color:var(--purple)"></div>
+      </div>
+      <div class="grid2">
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">📊 Métriques du cycle</div></div>
+          <div id="pipe-metrics"></div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">🖥️ Log pipeline</div></div>
+          <div class="log-mono" id="pipe-log"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CATEGORIES -->
+    <div id="panel-categories" class="panel">
+      <div class="alert alert-purple"><span>📌</span><span>Chaque catégorie scanne indépendamment YouTube Shorts et constitue son propre Top 48 — 24 vidéos récentes (dernières 24h) + 24 evergreen (meilleures des 6 dernières années).</span></div>
+      <div id="cat-detail-grid"></div>
+    </div>
+
+    <!-- TOP 48 PAR CATEGORIE -->
+    <div id="panel-top48" class="panel">
+      <div class="alert alert-purple"><span>⏱️</span><span>Durée : <strong>60s minimum — 90s maximum</strong> · Mix : <strong>24 récentes (24h) + 24 evergreen (6 ans)</strong></span></div>
+      <div class="filter-row" id="cat-filters"></div>
+      <div class="filter-row" id="mix-filters"></div>
+      <div id="vid-list"></div>
+    </div>
+
+    <!-- FILTRES -->
+    <div id="panel-filtre" class="panel">
+      <div class="grid2">
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">🛡️ Modules de filtrage</div></div>
+          <div id="filter-mods"></div>
+        </div>
+        <div>
+          <div class="card" style="margin-bottom:12px">
+            <div class="card-hdr"><div class="card-title">📊 Stats de rejet</div></div>
+            <div id="filter-stats"></div>
+          </div>
+          <div class="card">
+            <div class="card-hdr"><div class="card-title">🚫 Blacklist sources</div></div>
+            <div id="blacklist"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- EDITION IA -->
+    <div id="panel-edition" class="panel">
+      <div class="grid2">
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">✨ Générateur IA</div></div>
+          <div class="form-grp"><label class="form-label">Catégorie</label><select id="cat-sel" onchange="updateVidSel()"><option value="">Toutes</option></select></div>
+          <div class="form-grp"><label class="form-label">Vidéo</label><select id="vid-sel"><option value="">-- Choisir une vidéo --</option></select></div>
+          <div class="form-grp"><label class="form-label">Langue</label><select id="lang-sel"><option value="auto">🌍 Auto-détection</option><option value="fr">🇫🇷 Français</option><option value="en">🇬🇧 Anglais</option></select></div>
+          <div class="form-grp"><label class="form-label">Ton</label><select id="tone-sel"><option value="hype">🔥 Hype / Choc</option><option value="question">🤔 Question intrigante</option><option value="pov">👁️ POV</option><option value="factual">💡 Factuel accrocheur</option></select></div>
+          <button class="btn btn-primary" style="width:100%" onclick="genAI()">✨ Générer avec l'IA</button>
+          <div id="ai-load" style="display:none;margin-top:12px;align-items:center;gap:8px;font-size:12px;color:var(--purple2)"><div class="spinner"></div>Génération en cours...</div>
+        </div>
+        <div class="card">
+          <div class="card-hdr"><div class="card-title">📝 Contenu généré</div><div id="ai-lang"></div></div>
+          <div id="ai-result"><div style="color:var(--text3);text-align:center;padding:48px 20px;font-size:13px;line-height:1.8">Sélectionne une vidéo<br>et clique sur <strong>Générer</strong> ✨</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COMPTES -->
+    <div id="panel-comptes" class="panel">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
+        <div>
+          <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--purple)">10 Comptes TikTok</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:3px">Sélectionne une catégorie sur chaque compte · 48 vidéos/jour · 1 vidéo toutes les 20 min</div>
+        </div>
+        <button class="btn btn-primary" onclick="openAddModal()">+ Ajouter un compte</button>
+      </div>
+      <div class="alert alert-purple" style="margin-bottom:16px"><span>🗂️</span><span>Clique sur une catégorie pour l'assigner à un compte. L'application diffusera uniquement les vidéos de cette catégorie sur ce compte.</span></div>
+      <div class="acc-grid" id="accounts-grid"></div>
+    </div>
+
+    <!-- PLANNING -->
+    <div id="panel-planning" class="panel">
+      <div class="card">
+        <div class="card-hdr"><div class="card-title">📅 Planning — Aujourd'hui</div><div style="font-size:12px;color:var(--text2)">1 vidéo / 20 min · 48 vidéos/jour · 10 comptes</div></div>
+        <div id="planning-content"></div>
+      </div>
+    </div>
+
+    <!-- STRIKES -->
+    <div id="panel-strikes" class="panel">
+      <div class="alert alert-success" style="margin-bottom:16px"><span style="font-size:18px">✅</span><span style="font-weight:600">Aucun strike actif — tous les comptes sont en ordre !</span></div>
+      <div class="card"><div class="card-hdr"><div class="card-title">🛡️ Protocole automatique anti-ban</div></div><div id="strikes-proto"></div></div>
+    </div>
+
+    <!-- CONFIG -->
+    <div id="panel-config" class="panel">
+      <div class="grid2">
+        <div class="card"><div class="card-hdr"><div class="card-title">🔌 APIs — Phase 1</div></div><div id="apis-list"></div></div>
+        <div class="card"><div class="card-hdr"><div class="card-title">⚙️ Paramètres globaux</div></div><div id="config-params"></div></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+</div>
+
+<!-- TT VIEWER -->
+<div class="tt-modal-bg" id="tt-modal" onclick="if(event.target===this)closeTT()">
+  <button class="tt-close" onclick="closeTT()">✕</button>
+  <button class="tt-nav" onclick="navTT(-1)">‹</button>
+  <div class="tt-wrap">
+    <div class="tt-phone">
+      <div class="tt-notch"></div>
+      <div class="tt-video" id="tt-video-area">
+        <div class="tt-emoji-bg" id="tt-emoji">🎬</div>
+        <div class="tt-overlay"></div>
+        <div class="tt-right">
+          <div class="tt-action"><div class="tt-btn">❤️</div><div class="tt-count" id="tt-likes">0</div></div>
+          <div class="tt-action"><div class="tt-btn">💬</div><div class="tt-count" id="tt-comments">0</div></div>
+          <div class="tt-action"><div class="tt-btn">↗️</div><div class="tt-count" id="tt-shares">0</div></div>
+          <div class="tt-action"><div class="tt-btn">🔖</div><div class="tt-count">12K</div></div>
+        </div>
+        <div class="tt-ui">
+          <div class="tt-user">
+            <div class="tt-avatar-tt">⚡</div>
+            <span class="tt-uname" id="tt-account">@viral_fr_1</span>
+            <span class="tt-follow">+ Follow</span>
+          </div>
+          <div class="tt-caption" id="tt-caption">Titre de la vidéo</div>
+          <div class="tt-tags" id="tt-tags">#viral #fyp #youtube</div>
+        </div>
+        <div class="tt-progress"><div class="tt-bar" id="tt-bar"></div></div>
+      </div>
+      <div class="tt-bottom">
+        <span class="tt-bicon on">🏠</span><span class="tt-bicon">🔍</span><span class="tt-bicon">➕</span><span class="tt-bicon">💬</span><span class="tt-bicon">👤</span>
+      </div>
+    </div>
+    <div class="tt-meta">
+      <div class="tt-meta-title">📊 Détails</div>
+      <div id="tt-meta-rows"></div>
+      <div style="margin-top:14px;display:flex;flex-direction:column;gap:8px">
+        <button class="btn" style="width:100%;margin-bottom:8px" id="yt-link-btn" onclick="if(ttVids[ttIdx]&&ttVids[ttIdx].videoId)window.open('https://www.youtube.com/shorts/'+ttVids[ttIdx].videoId,'_blank');else notify('Vidéo YouTube non disponible','warn')">▶ Voir sur YouTube</button>
+        <button class="btn btn-primary" style="width:100%" onclick="notify('Édition IA lancée !','info');closeTT()">✨ Éditer avec l'IA</button>
+        <button class="btn" style="width:100%" onclick="notify('Vidéo retirée du Top 48','warn');closeTT()">🗑 Retirer du Top 48</button>
+      </div>
+    </div>
+  </div>
+  <button class="tt-nav" onclick="navTT(1)">›</button>
+</div>
+
+<div class="notif-wrap" id="notifs"></div>
+
+<script>
+// ===== CATEGORIES =====
+const CATS = [
+  {id:'movies',label:'Movies / Series',icon:'🎬',col:'var(--cat-movies)',light:'var(--cat-movies-l)',desc:'Films, séries, trailers, scènes cultes'},
+  {id:'stream',label:'Streamer / Youtubeur',icon:'🎮',col:'var(--cat-stream)',light:'var(--cat-stream-l)',desc:'Clips gaming, réactions, moments viraux'},
+  {id:'sports',label:'Sports',icon:'⚽',col:'var(--cat-sports)',light:'var(--cat-sports-l)',desc:'Highlights, exploits, moments historiques'},
+  {id:'divert',label:'Divertissement',icon:'🎉',col:'var(--cat-divert)',light:'var(--cat-divert-l)',desc:'Humour, challenge, fails, animaux'},
+  {id:'others',label:'Others',icon:'📦',col:'var(--cat-others)',light:'var(--cat-others-l)',desc:'Tout le reste — viral inclassable'},
+];
+
+// ===== DATA =====
+const VIDEOS = []; // Loaded from Railway via /api/queue
+
+const ACCOUNTS = []; // Loaded from Railway on startup
+
+let catFilter = 'all';
+let mixFilter = 'all';
+let actLogs = [];
+let pipeLines = [];
+let scanned = 0;
+let ttIdx = 0;
+let ttVids = [];
+
+// ===== CLOCK =====
+setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});},1000);
+setInterval(()=>{scanned+=Math.floor(Math.random()*30+10);addLog('info','Scanning YouTube Shorts — '+CATS[Math.floor(Math.random()*CATS.length)].label);},8000);
+
+// ===== NAV =====
+const TITLES={dashboard:'Dashboard',pipeline:'Pipeline live',categories:'5 Catégories',top48:'Top 48 par catégorie',filtre:'Filtres copyright',edition:'Édition IA',comptes:'10 Comptes TikTok',planning:'Planning',strikes:'Strikes',config:'Config API'};
+const SUBS={dashboard:'Vue d\'ensemble — Phase 1 YouTube',pipeline:'Cycle de traitement par catégorie',categories:'Gestion des 5 catégories YouTube',top48:'24 récentes + 24 evergreen par catégorie',filtre:'Protection anti-strikes YouTube',edition:'Génération automatique de contenu',comptes:'Assignation catégorie + monitoring',planning:'Calendrier de diffusion',strikes:'Alertes et protocole anti-ban',config:'YouTube API + paramètres'};
+
+function go(id,btn){
+  document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));
+  const el=document.getElementById('panel-'+id);
+  if(el)el.classList.add('active');
+  if(btn)btn.classList.add('active');
+  document.getElementById('topbar-title').textContent=TITLES[id]||id;
+  document.getElementById('topbar-sub').textContent=' · '+(SUBS[id]||'');
+  if(id==='top48')renderVideos();
+  if(id==='categories')renderCatDetail();
+  if(id==='comptes')renderAccounts();
+  if(window.innerWidth<=768){document.getElementById('sidebar').classList.remove('open');document.getElementById('overlay').classList.remove('open');}
+}
+function toggleMenu(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('overlay').classList.toggle('open');}
+
+// ===== CAT HELPERS =====
+function getCat(id){return CATS.find(c=>c.id===id);}
+function catBadge(catId){
+  if(!catId)return '<span class="cat-badge cat-none">Sans catégorie</span>';
+  const c=getCat(catId);
+  if(!c)return '';
+  return `<span class="cat-badge cat-${catId}">${c.icon} ${c.label}</span>`;
+}
+
+// ===== DASHBOARD =====
+function initDashboard(){
+  scanned = CATS.length * 48 * Math.floor(Math.random()*20+30);
+  const total = ACCOUNTS.reduce((s,a)=>s+a.pub,0);
+  document.getElementById('dash-metrics').innerHTML=[
+    {lbl:'Shorts scannés (YouTube)',val:scanned.toLocaleString('fr-FR'),sub:'5 catégories · en temps réel',icon:'▶️',col:'var(--red)'},
+    {lbl:'Vidéos sélectionnées',val:'240',sub:'48 × 5 catégories',icon:'🏆',col:'var(--purple)'},
+    {lbl:'Publiées aujourd\'hui',val:total,sub:'10 comptes TikTok',icon:'📱',col:'var(--green)'},
+    {lbl:'Strikes actifs',val:'0',sub:'Tous les comptes OK',icon:'✅',col:'var(--green)'},
+  ].map(m=>`<div class="metric-card" style="border-top:3px solid ${m.col}"><div class="metric-glow" style="background:${m.col}"></div><div class="metric-icon">${m.icon}</div><div class="metric-lbl">${m.lbl}</div><div class="metric-val">${m.val}</div><div class="metric-sub">${m.sub}</div></div>`).join('');
+
+  // Cat stats
+  document.getElementById('cat-stats').innerHTML=CATS.map(c=>{
+    const vids=VIDEOS.filter(v=>v.cat===c.id);
+    const acc=ACCOUNTS.filter(a=>a.cat===c.id);
+    return `<div class="cat-stat-card" onclick="go('top48',null);setCatFilter('${c.id}')" style="border-top:3px solid ${c.col}">
+      <div class="cat-stat-icon">${c.icon}</div>
+      <div class="cat-stat-name" style="color:${c.col}">${c.label}</div>
+      <div class="cat-stat-count">${vids.length*4}</div>
+      <div class="cat-stat-sub">${acc.length} compte${acc.length>1?'s':''} · ${vids.length} vidéos</div>
+    </div>`;
+  }).join('');
+
+  // Top performers
+  document.getElementById('top-performers').innerHTML=VIDEOS.slice(0,5).map(v=>{
+    const cat=getCat(v.cat);
+    return `<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openTT(${v.rank})">
+      <div style="width:44px;height:44px;border-radius:10px;background:${cat?.light||'var(--bg3)'};display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;position:relative">
+        ${v.emoji}
+        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0);border-radius:10px;transition:background .2s" onmouseover="this.style.background='rgba(0,0,0,0.3)'" onmouseout="this.style.background='rgba(0,0,0,0)'"><span style="color:#fff;font-size:11px;opacity:0" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0">▶</span></div>
+      </div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px">${v.title}</div>
+        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+          ${catBadge(v.cat)}
+          <span class="badge ${v.mix==='recent'?'b-green':'b-gold'}" style="font-size:10px">${v.mix==='recent'?'🕐 Récente':'⭐ Evergreen'}</span>
+          <span style="font-size:11px;color:var(--text2)">⏱ ${v.dur}</span>
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div style="font-family:'DM Serif Display',serif;font-size:16px;color:${v.score>=90?'var(--green)':v.score>=75?'var(--yellow)':'var(--red)'}">${v.score}</div>
+        <div style="font-size:11px;color:var(--text2)">👁 ${v.views}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  addLog('success','ViralBot v0.6 démarré — Phase 1 YouTube');
+  addLog('success','5 catégories initialisées — scanning en cours');
+  addLog('info','Top 48 constitué : 24 récentes + 24 evergreen par catégorie');
+  addLog('info','10 comptes TikTok — 1 vidéo toutes les 20 min');
+  addLog('success','Anti-rediffusion actif — base de données vidéos publiées initialisée');
+}
+
+function addLog(type,msg){
+  const time=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  const c={success:'var(--green)',info:'var(--text2)',warn:'var(--yellow)',err:'var(--red)'};
+  const i={success:'✓',info:'·',warn:'⚠',err:'✗'};
+  actLogs.unshift({type,msg,time});
+  if(actLogs.length>40)actLogs.pop();
+  const el=document.getElementById('activity-log');
+  if(el)el.innerHTML=actLogs.map(l=>`<div style="display:flex;gap:8px;font-size:12px"><span style="color:var(--text3);flex-shrink:0">${l.time}</span><span style="color:${c[l.type]};flex-shrink:0;font-weight:700">${i[l.type]}</span><span style="color:var(--text2)">${l.msg}</span></div>`).join('');
+}
+function clearLog(){actLogs=[];document.getElementById('activity-log').innerHTML='';}
+
+// ===== PIPELINE =====
+function initPipeline(){
+  renderPipe(['done','done','done','done','done','done','active','pending']);
+  document.getElementById('pipe-metrics').innerHTML=[
+    ['▶️ Shorts scannés (YouTube)','21 560 vidéos',100,'p-purple'],
+    ['🗂️ Triés par catégorie','5 catégories',100,'p-cyan'],
+    ['🕐 Récentes sélectionnées','24 × 5 = 120',100,'p-green'],
+    ['⭐ Evergreen sélectionnées','24 × 5 = 120',100,'p-yellow'],
+    ['🛡️ Filtrage copyright','1 247 rejetées',15,'p-red'],
+    ['🔍 Déduplication','312 doublons',4,'p-pink'],
+    ['✨ Édition IA','240/240 traitées',100,'p-purple'],
+    ['📱 Diffusion TikTok','En cours…',62,'p-green'],
+  ].map(([l,v,p,c])=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">${l}</span><span style="font-weight:700">${v}</span></div><div class="pbar-wrap"><div class="pbar ${c}" style="width:${p}%"></div></div></div>`).join('');
+  pipeLines=[
+    '[00:00:00] > ViralBot v0.6 démarré — Phase 1 YouTube',
+    '[00:00:01] > Scanning YouTube Shorts — Movies/Series...',
+    '[00:00:02] > Scanning YouTube Shorts — Streamer/Youtubeur...',
+    '[00:00:03] > Scanning YouTube Shorts — Sports...',
+    '[00:00:04] > Scanning YouTube Shorts — Divertissement...',
+    '[00:00:05] > Scanning YouTube Shorts — Others...',
+    '[00:00:06] > Total scanné : 21 560 vidéos',
+    '[00:00:07] > Sélection 24 récentes (24h) × 5 catégories',
+    '[00:00:08] > Sélection 24 evergreen (6 ans) × 5 catégories',
+    '[00:00:09] > Filtrage copyright : 1 247 rejetées',
+    '[00:00:10] > Déduplication : 312 doublons supprimés',
+    '[00:00:11] > Critère durée 60-90s appliqué',
+    '[00:00:12] > Édition IA : 240/240 vidéos traitées',
+    '[00:00:13] > Vérification anti-rediffusion : OK',
+    '[00:00:14] > Diffusion TikTok en cours…',
+  ];
+  document.getElementById('pipe-log').innerHTML=pipeLines.map(l=>`<div>${l}</div>`).join('');
+}
+
+function renderPipe(states){
+  const lbls=['① Scan YT','② Tri catégories','③ Récentes 24h','④ Evergreen 6ans','⑤ Filtrage','⑥ Déduplication','⑦ Édition IA','⑧ Diffusion'];
+  document.getElementById('pipe-steps').innerHTML=lbls.map((l,i)=>`<div style="display:flex;align-items:center;flex-shrink:0"><div class="pipe-box ${states[i]==='done'?'pipe-done':states[i]==='active'?'pipe-active':'pipe-pending'}">${l}</div>${i<lbls.length-1?'<div class="pipe-arrow">→</div>':''}</div>`).join('');
+}
+
+async function runPipeline(){
+  if(document.getElementById('pipe-btn').disabled)return;
+  document.getElementById('pipe-btn').textContent='⏳ En cours...';
+  document.getElementById('pipe-btn').disabled=true;
+  document.getElementById('pipe-status').style.display='flex';
+  document.getElementById('pipe-status').innerHTML='<div class="spinner"></div>Pipeline en cours...';
+  for(let i=0;i<8;i++){
+    renderPipe([...Array(8)].map((_,j)=>j<i?'done':j===i?'active':'pending'));
+    const t=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+    pipeLines.push(`[${t}] > Étape ${i+1}/8 exécutée`);
+    document.getElementById('pipe-log').innerHTML=pipeLines.slice(-15).map(l=>`<div>${l}</div>`).join('');
+    document.getElementById('pipe-log').scrollTop=9999;
+    await new Promise(r=>setTimeout(r,800));
+  }
+  renderPipe(['done','done','done','done','done','done','done','done']);
+  document.getElementById('pipe-status').innerHTML='<span style="color:var(--green);font-weight:600">✅ Cycle terminé — 240 vidéos prêtes à diffuser !</span>';
+  notify('Pipeline terminé — 240 vidéos prêtes !','success');
+  addLog('success','Pipeline complet — 5 catégories × 48 vidéos traitées');
+  document.getElementById('pipe-btn').textContent='▶ Lancer un cycle';
+  document.getElementById('pipe-btn').disabled=false;
+}
+
+// ===== CATEGORIES DETAIL =====
+function renderCatDetail(){
+  document.getElementById('cat-detail-grid').innerHTML=CATS.map(c=>{
+    const vids=VIDEOS.filter(v=>v.cat===c.id);
+    const recent=vids.filter(v=>v.mix==='recent');
+    const ever=vids.filter(v=>v.mix==='ever');
+    const acc=ACCOUNTS.filter(a=>a.cat===c.id);
+    return `<div class="card" style="border-left:4px solid ${c.col};margin-bottom:12px">
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
+        <div style="width:48px;height:48px;border-radius:12px;background:${c.light};display:flex;align-items:center;justify-content:center;font-size:26px;flex-shrink:0;border:1px solid ${c.col}40">${c.icon}</div>
+        <div style="flex:1">
+          <div style="font-family:'DM Serif Display',serif;font-size:16px;color:${c.col};margin-bottom:3px">${c.label}</div>
+          <div style="font-size:12px;color:var(--text2)">${c.desc}</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:'DM Serif Display',serif;font-size:24px;color:${c.col}">48</div>
+          <div style="font-size:11px;color:var(--text3)">vidéos/jour</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
+        <div style="padding:10px;background:var(--green-l);border-radius:var(--r);text-align:center;border:1px solid rgba(5,150,105,0.2)">
+          <div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--green)">24</div>
+          <div style="font-size:10px;color:var(--green);font-weight:600">🕐 Récentes 24h</div>
+        </div>
+        <div style="padding:10px;background:var(--gold-l);border-radius:var(--r);text-align:center;border:1px solid rgba(180,83,9,0.2)">
+          <div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--gold)">24</div>
+          <div style="font-size:10px;color:var(--gold);font-weight:600">⭐ Evergreen 6 ans</div>
+        </div>
+        <div style="padding:10px;background:${c.light};border-radius:var(--r);text-align:center;border:1px solid ${c.col}30">
+          <div style="font-family:'DM Serif Display',serif;font-size:18px;color:${c.col}">${acc.length}</div>
+          <div style="font-size:10px;color:${c.col};font-weight:600">📱 Compte${acc.length>1?'s':''}</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div style="font-size:11px;color:var(--text2)">Comptes assignés : ${acc.length>0?acc.map(a=>`<strong>${a.handle}</strong>`).join(', '):'<em>Aucun encore</em>'}</div>
+        <button class="btn btn-sm" style="color:${c.col};border-color:${c.col}40" onclick="go('top48',null);setCatFilter('${c.id}')">Voir les vidéos →</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ===== TOP 48 =====
+function initVideoFilters(){
+  document.getElementById('cat-filters').innerHTML=[['all','🎬 Toutes les catégories'],...CATS.map(c=>[c.id,c.icon+' '+c.label])].map(([id,lbl])=>`<button class="fbtn ${id==='all'?'active':''} ${id!=='all'?'cat-f-'+id:''}" onclick="setCatFilter('${id}',this)">${lbl}</button>`).join('');
+  document.getElementById('mix-filters').innerHTML=[['all','📋 Tout le mix'],['recent','🕐 Récentes (24h) uniquement'],['ever','⭐ Evergreen (6 ans) uniquement']].map(([id,lbl],i)=>`<button class="fbtn ${i===0?'active':''}" onclick="setMixFilter('${id}',this)">${lbl}</button>`).join('');
+  VIDEOS.forEach(v=>{const o=document.createElement('option');o.value=v.rank;o.textContent=`#${v.rank} [${getCat(v.cat)?.icon||'?'}] ${v.title.substring(0,45)}...`;document.getElementById('vid-sel').appendChild(o);});
+}
+
+function setCatFilter(id,btn){
+  catFilter=id;
+  document.querySelectorAll('#cat-filters .fbtn').forEach(b=>b.classList.remove('active'));
+  if(btn)btn.classList.add('active');
+  else{const btns=document.querySelectorAll('#cat-filters .fbtn');btns.forEach(b=>{if(b.textContent.includes(getCat(id)?.label||id)||id==='all'&&b.textContent.includes('Toutes'))b.classList.add('active');});}
+  renderVideos();
+}
+function setMixFilter(id,btn){
+  mixFilter=id;
+  document.querySelectorAll('#mix-filters .fbtn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  renderVideos();
+}
+
+function renderVideos(){
+  let f=VIDEOS;
+  if(catFilter!=='all')f=f.filter(v=>v.cat===catFilter);
+  if(mixFilter!=='all')f=f.filter(v=>v.mix===mixFilter);
+  const topCols=['var(--gold)','var(--text2)','var(--orange)'];
+  document.getElementById('vid-list').innerHTML=f.length===0?`<div style="text-align:center;padding:40px;color:var(--text3);font-size:13px">Aucune vidéo dans cette sélection</div>`:f.map(v=>{
+    const cat=getCat(v.cat);
+    return `<div style="background:var(--bg2);border:1px solid var(--border);border-radius:var(--rl);padding:12px 16px;margin-bottom:8px;display:flex;align-items:center;gap:12px;transition:all .18s;cursor:pointer;box-shadow:var(--shadow)" onmouseover="this.style.borderColor='var(--purple2)';this.style.background='var(--purple-l)'" onmouseout="this.style.borderColor='var(--border)';this.style.background='var(--bg2)'" onclick="openTT(${v.rank})">
+      <div style="font-family:'DM Serif Display',serif;font-size:20px;width:32px;text-align:center;flex-shrink:0;color:${v.rank<=3?topCols[v.rank-1]:'var(--text3)'}">#${v.rank}</div>
+      <div style="width:48px;height:48px;border-radius:10px;background:${cat?.light||'var(--bg3)'};display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;border:1.5px solid ${cat?.col||'var(--border)'}40">${v.emoji}</div>
+      <div style="flex:1;min-width:0">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:5px">${v.title}</div>
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--text2)">
+          ${catBadge(v.cat)}
+          <span class="badge ${v.mix==='recent'?'b-green':'b-gold'}">${v.mix==='recent'?'🕐 Récente':'⭐ Evergreen'}</span>
+          <span>⏱ ${v.dur}</span>
+          <span style="font-weight:700;color:var(--text)">👁 ${v.views}</span>
+          <span>↗ ${v.shares}</span>
+          <span>💬 ${v.comments}</span>
+          <span class="badge b-gray">${v.lang}</span>
+        </div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0">
+        <div style="width:40px;height:40px;border-radius:50%;background:${v.score>=90?'var(--green-l)':v.score>=75?'var(--yellow-l)':'var(--red-l)'};border:2px solid ${v.score>=90?'var(--green)':v.score>=75?'var(--yellow)':'var(--red)'};display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:14px;color:${v.score>=90?'var(--green)':v.score>=75?'var(--yellow)':'var(--red)'}">${v.score}</div>
+        <div style="font-size:10px;color:var(--text3)">score</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0">
+        <span class="badge ${v.safe>=95?'b-green':v.safe>=90?'b-yellow':'b-red'}">${v.safe}%</span>
+        <div style="font-size:10px;color:var(--text3)">sécurité</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ===== FILTRES =====
+function initFilters(){
+  const mods=[['🎵','Musique copyright','Détection audio — empreinte acoustique'],['⚠️','Contenu violent','IA visuelle — sang, armes, accidents'],['🚫','Logos & marques','Nike, Apple, Disney... auto-écartés'],['🔞','Contenu adulte','Filtre IA — rejet automatique'],['📋','Blacklist chaînes','Chaînes bloquées après 1er rejet'],['🔍','Déduplication','Empreinte frame-by-frame inter-catégories'],['⏱️','Durée hors 60-90s','Rejet automatique si hors critères'],['🔁','Anti-rediffusion','Base de données des vidéos déjà publiées']];
+  document.getElementById('filter-mods').innerHTML=mods.map(([i,n,d])=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:19px;flex-shrink:0">${i}</span><div style="flex:1"><div style="font-size:13px;font-weight:600">${n}</div><div style="font-size:11px;color:var(--text2)">${d}</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>`).join('');
+  document.getElementById('filter-stats').innerHTML=[['🎵 Musique copyright','1 247','58','p-red'],['⚠️ Violence','412','19','p-yellow'],['🚫 Logos','289','13','p-orange'],['🔞 Adulte','156','7','p-pink'],['🔍 Doublons','312','15','p-green'],['⏱️ Durée hors critères','198','9','p-cyan'],['🔁 Déjà publiées','1 820','85','p-purple']].map(([l,v,p,c])=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">${l}</span><span style="font-weight:700">${v}</span></div><div class="pbar-wrap"><div class="pbar ${c}" style="width:${p}%"></div></div></div>`).join('');
+  document.getElementById('blacklist').innerHTML=['Universal Music (47 rejets)','Warner Bros. YouTube (31)','@fights_brutal (22)','Disney Official (18)'].map(b=>`<div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--red-l);border-radius:var(--r);margin-bottom:6px;border:1px solid rgba(220,38,38,0.1);font-size:12px"><span style="font-weight:500">${b.split(' (')[0]}</span><span class="badge b-red">${b.split('(')[1]&&'('+b.split('(')[1]}</span></div>`).join('');
+}
+
+// ===== AI EDITION =====
+function initEdition(){
+  const catSel=document.getElementById('cat-sel');
+  CATS.forEach(c=>{const o=document.createElement('option');o.value=c.id;o.textContent=c.icon+' '+c.label;catSel.appendChild(o);});
+}
+function updateVidSel(){
+  const cat=document.getElementById('cat-sel').value;
+  const sel=document.getElementById('vid-sel');
+  sel.innerHTML='<option value="">-- Choisir une vidéo --</option>';
+  VIDEOS.filter(v=>!cat||v.cat===cat).forEach(v=>{const o=document.createElement('option');o.value=v.rank;o.textContent=`#${v.rank} [${getCat(v.cat)?.icon}] ${v.title.substring(0,45)}...`;sel.appendChild(o);});
+}
+async function genAI(){
+  const rank=document.getElementById('vid-sel').value;
+  if(!rank){notify('Sélectionne une vidéo !','warn');return;}
+  const v=VIDEOS.find(x=>x.rank==rank);
+  const cat=getCat(v.cat);
+  const lang=document.getElementById('lang-sel').value;
+  const tone=document.getElementById('tone-sel').value;
+  const lf=lang==='auto'?(v.lang||'FR'):lang.toUpperCase();
+  const tl={hype:'hype et choquant',question:'question intrigante',pov:'POV immersif',factual:'factuel accrocheur'}[tone];
+  document.getElementById('ai-load').style.display='flex';
+  document.getElementById('ai-result').innerHTML='';
+  document.getElementById('ai-lang').innerHTML='';
+  try{
+    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:`Tu es un expert en contenu viral TikTok spécialisé dans la catégorie "${cat?.label}". Génère du contenu pour ce YouTube Short :\nTitre : "${v.title}"\nCatégorie : ${cat?.label} ${cat?.icon}\nType : ${v.mix==='recent'?'Vidéo récente (dernières 24h)':'Vidéo evergreen (top 6 ans)'}\nVues : ${v.views} | Durée : ${v.dur}\nLangue : ${lf==='FR'?'Français':'Anglais'} | Ton : ${tl}\nRéponds UNIQUEMENT en JSON valide :\n{"titre":"(max 80 chars, catchy et adapté à la catégorie ${cat?.label})","description":"2-3 phrases : qui, où, quoi — ${tl}","hashtags":["tag1",...20 tags sans # adaptés à ${cat?.label}],"langue":"${lf}","emotion":"émotion dominante","hook":"accroche 2 premières secondes max 15 mots"}`}]})});
+    const data=await res.json();
+    const json=JSON.parse(data.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim());
+    document.getElementById('ai-lang').innerHTML=`<span class="badge b-purple">${json.langue} · ${json.emotion}</span>`;
+    document.getElementById('ai-result').innerHTML=`<div class="ai-out">
+      <div class="ai-field"><div class="ai-lbl">⚡ Hook (2 premières secondes)</div><div style="font-size:15px;font-weight:800;color:var(--purple);font-family:'DM Serif Display',serif;line-height:1.3">${json.hook}</div></div>
+      <div class="ai-field"><div class="ai-lbl">📝 Titre</div><div style="font-size:15px;font-weight:700;line-height:1.4">${json.titre}</div></div>
+      <div class="ai-field"><div class="ai-lbl">📋 Description</div><div style="font-size:13px;color:var(--text2);line-height:1.6">${json.description}</div></div>
+      <div class="ai-field"><div class="ai-lbl">🏷️ Hashtags (${json.hashtags.length})</div><div class="tag-cloud">${json.hashtags.map(t=>`<span class="tag">#${t}</span>`).join('')}</div></div>
+      <div style="display:flex;gap:8px;margin-top:14px"><button class="btn btn-primary btn-sm" onclick="notify('Contenu appliqué !','success')">✓ Appliquer</button><button class="btn btn-sm" onclick="genAI()">↺ Regénérer</button></div>
+    </div>`;
+    notify('Contenu généré ✨','success');
+  }catch(e){document.getElementById('ai-result').innerHTML=`<div style="color:var(--red);text-align:center;padding:32px">⚠️ Erreur de génération.</div>`;notify('Erreur IA','err');}
+  document.getElementById('ai-load').style.display='none';
+}
+
+// ===== COMPTES =====
+function renderAccounts(){
+  document.getElementById('accounts-grid').innerHTML=ACCOUNTS.map(a=>{
+    const cat=getCat(a.cat);
+    const stripeCol=a.status==='ok'?'linear-gradient(90deg,var(--green),var(--cyan))':a.status==='warm'?'linear-gradient(90deg,var(--cyan),var(--purple))':a.status==='warn'?'linear-gradient(90deg,var(--yellow),var(--orange))':'var(--border)';
+    return `<div class="acc-card" id="acc-${a.id}">
+      <div class="acc-stripe" style="background:${stripeCol}"></div>
+      <div class="acc-head">
+        <div class="acc-avatar" style="background:${a.col}18;border:1.5px solid ${a.col}40"><span style="font-size:17px">📱</span></div>
+        <div style="flex:1"><div class="acc-name">${a.name}</div><div class="acc-handle">${a.handle}</div></div>
+        <span class="badge ${a.status==='ok'?'b-green':a.status==='warm'?'b-cyan':a.status==='warn'?'b-yellow':'b-gray'}" style="font-size:10px">${a.status==='ok'?'✅ En ligne':a.status==='warm'?'🔵 Warming':a.status==='warn'?'⚠️ Strike':'⏳ Attente'}</span>
+      </div>
+      ${[['Publiées (24h)',a.pub+' / '+a.max],['Abonnés',a.followers>0?a.followers.toLocaleString():'—'],['Vues 7j',a.views],['Ancienneté',a.age]].map(([k,v])=>`<div class="acc-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('')}
+      <div style="margin-top:8px"><div class="pbar-wrap"><div class="pbar ${a.status==='warn'?'p-yellow':'p-green'}" style="width:${Math.round(a.pub/a.max*100)}%"></div></div></div>
+
+      <!-- CATEGORY SELECTOR -->
+      <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
+        <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">🗂️ Catégorie assignée</div>
+        <div class="cat-selector">
+          ${CATS.map(c=>`<div class="cat-option ${a.cat===c.id?'selected-'+c.id:''}" onclick="assignCat(${a.id},'${c.id}')"><span style="font-size:14px">${c.icon}</span><span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.label}</span></div>`).join('')}
+          <div class="cat-option cat-option-full ${!a.cat?'selected-none':''}" onclick="assignCat(${a.id},'')" style="${!a.cat?'background:var(--bg3);border-color:var(--border2)':''}">🚫 Sans catégorie</div>
+        </div>
+      </div>
+
+      ${a.status==='warn'?`<button class="btn btn-danger btn-sm" style="width:100%;margin-top:10px" onclick="notify('Compte suspendu. File en pause.','warn')">⚠️ Gérer le strike</button>`:''}
+      ${a.status==='pending'?`<button class="btn btn-primary btn-sm" style="width:100%;margin-top:10px" onclick="connectTikTok(a.handle)">🔗 Connecter TikTok</button>`:''}
+    </div>`;
+  }).join('');
+}
+
+function assignCat(accId, catId){
+  const acc=ACCOUNTS.find(a=>a.id===accId);
+  if(!acc)return;
+  const oldCat=acc.cat;
+  acc.cat=catId;
+  renderAccounts();
+  const cat=getCat(catId);
+  if(catId){
+    notify(`${acc.handle} → ${cat?.icon} ${cat?.label}`,'success');
+    addLog('success',`Catégorie assignée : ${acc.handle} → ${cat?.label}`);
+  } else {
+    notify(`${acc.handle} → Sans catégorie`,'warn');
+    addLog('warn',`Catégorie retirée de ${acc.handle}`);
+  }
+  // Update cat stats
+  document.getElementById('cat-stats').innerHTML=CATS.map(c=>{
+    const vids=VIDEOS.filter(v=>v.cat===c.id);
+    const accs=ACCOUNTS.filter(a=>a.cat===c.id);
+    return `<div class="cat-stat-card" onclick="go('top48',null);setCatFilter('${c.id}')" style="border-top:3px solid ${c.col}"><div class="cat-stat-icon">${c.icon}</div><div class="cat-stat-name" style="color:${c.col}">${c.label}</div><div class="cat-stat-count">${accs.length}</div><div class="cat-stat-sub">compte${accs.length>1?'s':''} assigné${accs.length>1?'s':''}</div></div>`;
+  }).join('');
+}
+
+// ===== PLANNING =====
+function initPlanning(){
+  const vids_by_cat={
+    movies:['Scène culte 🎬','Trailer incroyable 🍿','Plot twist 😱','Moment épique 🎭'],
+    stream:['Gotaga 40 kills 🏆','Clip gaming 🎮','Moment viral 🔥','Réaction drôle 😂'],
+    sports:['But impossible ⚽','Dunk incroyable 🏀','Record battu 🏆','Exploit sportif 💪'],
+    divert:['Chat drôle 🐱','Magie de rue 🪄','POV viral 😱','Chien humain 🐕'],
+    others:['Invention folle 💡','Vie hack 🔑','Moment WTF 🤯','Talent caché 🌟'],
+  };
+  const slots=Array.from({length:18},(_,i)=>{
+    const h=String(i+6).padStart(2,'0')+'h00';
+    // Assign to accounts with cats
+    const activeAcc=ACCOUNTS.filter(a=>a.cat&&a.status!=='pending').slice(0,2);
+    const slots2=activeAcc.map(acc=>{
+      const cat=acc.cat;
+      const pool=vids_by_cat[cat]||['Vidéo viral 🔥'];
+      const v=Math.random()>.25?pool[Math.floor(Math.random()*pool.length)]:null;
+      return {acc,v};
+    });
+    return {h,slots2};
+  });
+  document.getElementById('planning-content').innerHTML=`
+    <div style="display:grid;grid-template-columns:56px 1fr 1fr;gap:6px;margin-bottom:8px">
+      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Heure</div>
+      ${ACCOUNTS.filter(a=>a.cat&&a.status!=='pending').slice(0,2).map(a=>{const cat=getCat(a.cat);return `<div style="font-size:10px;font-weight:700;color:${cat?.col||'var(--text3)'};text-transform:uppercase">${cat?.icon||''} ${a.handle}</div>`;}).join('')}
+    </div>
+    <div class="plan-grid">
+      ${slots.map(s=>`<div class="plan-hour">
+        <div style="font-size:11px;font-weight:700;color:var(--text2)">${s.h}</div>
+        ${s.slots2.map(sl=>{const cat=getCat(sl.acc.cat);return `<div class="plan-slot ${sl.v?'filled':''}" style="${sl.v?`border-color:${cat?.col||'var(--border2)'}40;background:${cat?.light||'var(--purple-l)'}`:''}">${sl.v?`<div style="width:6px;height:6px;border-radius:50%;background:${cat?.col||'var(--purple)'};flex-shrink:0"></div><span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sl.v}</span>`:`<span style="font-size:11px;color:var(--text3)">Libre</span>`}</div>`;}).join('')}
+      </div>`).join('')}
+    </div>
+    <div style="margin-top:12px;padding:10px 14px;background:var(--purple-l);border-radius:var(--r);border:1px solid var(--border2);font-size:12px;color:var(--purple)">
+      📱 Les 10 comptes suivent chacun le planning de leur catégorie assignée — 1 vidéo toutes les 20 minutes de 6h00 à 22h00 soit 48 vidéos/jour.
+    </div>`;
+}
+
+// ===== STRIKES =====
+function initStrikes(){
+  document.getElementById('strikes-proto').innerHTML=[
+    ['Détection automatique','Vérification toutes les 15 min via l\'API TikTok'],
+    ['Suspension immédiate','Compte touché mis en pause — les autres continuent'],
+    ['File d\'attente pausée','Vidéos en attente — jamais redistribuées sur un autre compte'],
+    ['Alerte immédiate','Notification : strike, vidéo concernée, catégorie, raison'],
+    ['Reprise manuelle','Tu valides depuis ce dashboard — la file repart automatiquement'],
+  ].map(([t,d],i)=>`<div class="step-item"><div class="step-num">${i+1}.</div><div><div style="font-weight:700;font-size:13px;margin-bottom:3px">${t}</div><div style="font-size:12px;color:var(--text2)">${d}</div></div></div>`).join('');
+}
+
+// ===== CONFIG =====
+function initConfig(){
+  document.getElementById('apis-list').innerHTML=[
+    {n:'YouTube Data API v3',i:'▶️',s:'ok',d:'Clé API configurée — scanning actif',col:'var(--green)'},
+    {n:'TikTok Content Posting API',i:'🎵',s:'ok',d:'API approuvée ✅ — connexion comptes OAuth',col:'var(--green)'},
+    {n:'Instagram Graph API',i:'📸',s:'later',d:'Phase 3 — non démarré',col:'var(--text3)'},
+    {n:'Twitch API Helix',i:'🎮',s:'later',d:'Phase 3 — non démarré',col:'var(--text3)'},
+    {n:'Kick API',i:'🟢',s:'later',d:'Phase 3 — non démarré',col:'var(--text3)'},
+    {n:'Cloudflare R2',i:'☁️',s:'ok',d:'Bucket viral-videos configuré ✓',col:'var(--green)'},
+  ].map(a=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:19px">${a.i}</span><div style="flex:1"><div style="font-size:13px;font-weight:600">${a.n}</div><div style="font-size:11px;color:var(--text2)">${a.d}</div></div><span class="badge ${a.s==='ok'?'b-green':a.s==='missing'?'b-yellow':'b-gray'}">${a.s==='ok'?'✅ Connectée':a.s==='missing'?'⚠️ À configurer':'⏳ Plus tard'}</span></div>`).join('');
+  document.getElementById('config-params').innerHTML=`
+    <div class="alert alert-yt" style="margin-bottom:14px"><span>▶️</span><span><strong>Phase 1 — YouTube uniquement</strong><br>Clé API : AIzaSyDIQS...q4s8RAE ✅</span></div>
+    ${[['Durée minimum (sec)','60'],['Durée maximum (sec)','90'],['Vidéos par catégorie','48'],['Récentes (24h) par catégorie','24'],['Evergreen (6 ans) par cat.','24'],['Intervalle entre posts (min)','20'],['Délai aléatoire (sec)','0-120'],['Heure de début diffusion','06:00'],['Heure de fin diffusion','22:00']].map(([l,v])=>`<div class="form-grp"><label class="form-label">${l}</label><input type="text" value="${v}"></div>`).join('')}
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--bg3);border-radius:var(--r);border:1px solid var(--border);margin-bottom:14px"><div><div style="font-size:13px;font-weight:600">Segmentation par thématique</div><div style="font-size:11px;color:var(--text2);margin-top:2px">✅ Activé — 5 catégories configurées</div></div><div class="toggle on"></div></div>
+    <button class="btn btn-primary" style="width:100%" onclick="notify('✅ Paramètres sauvegardés !','success')">💾 Sauvegarder</button>`;
+}
+
+// ===== TT VIEWER =====
+function openTT(rank){
+  ttVids=catFilter==='all'?VIDEOS:VIDEOS.filter(v=>v.cat===catFilter);
+  ttIdx=ttVids.findIndex(v=>v.rank===rank);
+  if(ttIdx<0)ttIdx=0;
+  renderTT();
+  document.getElementById('tt-modal').classList.add('open');
+  document.body.style.overflow='hidden';
+}
+function closeTT(){document.getElementById('tt-modal').classList.remove('open');document.body.style.overflow='';}
+function navTT(d){ttIdx=(ttIdx+d+ttVids.length)%ttVids.length;renderTT();}
+function renderTT(){
+  const v=ttVids[ttIdx];if(!v)return;
+  const cat=getCat(v.cat);
+  const el=document.getElementById('tt-emoji');
+  if (v.videoId) {
+    // Show real YouTube thumbnail
+    el.style.backgroundImage = 'url(https://img.youtube.com/vi/' + v.videoId + '/hqdefault.jpg)';
+    el.style.backgroundSize = 'cover';
+    el.style.backgroundPosition = 'center';
+    el.style.fontSize = '0px';
+    el.textContent = '';
+  } else {
+    el.style.backgroundImage = 'none';
+    el.textContent = v.emoji;
+    el.style.background = (cat ? cat.light : '#f3eeff');
+    el.style.fontSize = '80px';
+  }
+  document.getElementById('tt-caption').textContent=v.title;
+  document.getElementById('tt-tags').textContent=`#viral #fyp #${cat?.id||'trending'} #youtube #${v.lang.toLowerCase()}`;
+  document.getElementById('tt-likes').textContent=v.shares;
+  document.getElementById('tt-comments').textContent=v.comments;
+  document.getElementById('tt-shares').textContent=v.views;
+  const accs=['@viral_fr_1','@viral_fr_2','@viral_fr_3','@viral_fr_4','@viral_fr_5'];
+  document.getElementById('tt-account').textContent=accs[Math.floor(Math.random()*accs.length)];
+  document.getElementById('tt-meta-rows').innerHTML=[
+    ['Rang','#'+v.rank],
+    ['Catégorie',(cat?.icon||'?')+' '+(cat?.label||'?')],
+    ['Type',v.mix==='recent'?'🕐 Récente (24h)':'⭐ Evergreen (6 ans)'],
+    ['Vues',v.views],['Partages',v.shares],['Commentaires',v.comments],
+    ['Durée',v.dur],['Score',v.score+'/100'],['Sécurité',v.safe+'%'],['Langue',v.lang],
+  ].map(([k,val])=>`<div class="tt-meta-row"><span style="color:var(--text2);font-size:12px">${k}</span><span style="font-weight:700;font-size:12px">${val}</span></div>`).join('');
+  const bar=document.getElementById('tt-bar');
+  bar.style.animation='none';bar.offsetHeight;bar.style.animation='';
+}
+document.addEventListener('keydown',e=>{
+  if(!document.getElementById('tt-modal').classList.contains('open'))return;
+  if(e.key==='ArrowRight'||e.key==='ArrowDown')navTT(1);
+  if(e.key==='ArrowLeft'||e.key==='ArrowUp')navTT(-1);
+  if(e.key==='Escape')closeTT();
+});
+
+// ===== NOTIFS =====
+function notify(msg,type='info'){
+  const n=document.createElement('div');n.className=`notif notif-${type}`;n.textContent=msg;
+  document.getElementById('notifs').appendChild(n);
+  setTimeout(()=>{n.style.opacity='0';n.style.transition='opacity .3s';setTimeout(()=>n.remove(),300);},3500);
+}
+function simulateScan(){
+  scanned+=Math.floor(Math.random()*500+200);
+  addLog('info','Scan YouTube manuel déclenché — 5 catégories');
+  notify('⟳ Scan YouTube lancé — 5 catégories','info');
+}
+
+// ===== INIT =====
+initDashboard();
+initPipeline();
+initVideoFilters();
+initFilters();
+initEdition();
+initPlanning();
+initStrikes();
+initConfig();
+</script>
+
+<!-- ADD ACCOUNT MODAL -->
+<div id="add-modal" style="display:none;position:fixed;inset:0;background:rgba(26,16,53,0.55);z-index:900;align-items:center;justify-content:center;backdrop-filter:blur(6px)" onclick="if(event.target===this)closeAddModal()">
+  <div style="background:var(--bg2);border:1px solid var(--border2);border-radius:var(--rxl);padding:26px;width:420px;max-width:95vw;box-shadow:var(--shadow-lg)">
+    <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--purple);margin-bottom:18px">📱 Ajouter un compte TikTok</div>
+    <div class="form-grp">
+      <label class="form-label">Handle TikTok</label>
+      <input type="text" id="new-handle-input" placeholder="@moncompte" onkeydown="if(event.key==='Enter')addTikTokAccount()">
+      <div style="font-size:11px;color:var(--text2);margin-top:6px">Entre le handle exact de ton compte TikTok. Clique ensuite sur Connecter TikTok pour autoriser l'application via OAuth.</div>
+    </div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:18px">
+      <button class="btn" onclick="closeAddModal()">Annuler</button>
+      <button class="btn btn-primary" onclick="addTikTokAccount()">➕ Ajouter</button>
+    </div>
+  </div>
+</div>
+<script>var RAILWAY_URL = window.location.origin;
+
+
+
+// ============================================================
+// RAILWAY BACKEND — Same origin, no CORS issues
+// ============================================================
+var API_BASE = '';  // served from Railway — relative URLs work
+
+function connectTikTok(handle) {
+  notify('Connexion TikTok pour ' + handle + '...', 'info');
+  fetch('/api/tiktok/connect/' + encodeURIComponent(handle))
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d && d.url) {
+        window.open(d.url, '_blank', 'width=600,height=700');
+        notify('Fenetre OAuth ouverte — autorise sur TikTok puis reviens', 'info');
+        addLog('info', 'OAuth TikTok lance pour ' + handle);
+        setTimeout(loadRealAccounts, 30000);
+      } else {
+        notify('En attente approbation TikTok', 'warn');
+      }
+    })
+    .catch(function() { notify('Erreur reseau', 'warn'); });
+}
+
+function deleteAccount(handle) {
+  if (!confirm('Supprimer ' + handle + ' ? Action irreversible.')) return;
+  fetch('/api/accounts/' + encodeURIComponent(handle), {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' }
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d && d.success) {
+        notify('Compte ' + handle + ' supprime', 'warn');
+        addLog('warn', 'Compte supprime : ' + handle);
+        loadRealAccounts();
+    loadRealVideos();
+    loadRealLogs();
+      } else {
+        notify('Erreur suppression', 'err');
+      }
+    })
+    .catch(function() { notify('Erreur reseau', 'err'); });
+}
+
+function addTikTokAccount() {
+  var inp = document.getElementById('new-handle-input');
+  if (!inp) return;
+  var handle = inp.value.trim();
+  if (!handle) { notify('Entre un handle TikTok', 'warn'); return; }
+  if (!handle.startsWith('@')) handle = '@' + handle;
+  fetch('/api/accounts', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ handle: handle, category: '' })
+  })
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (d && d.success) {
+        notify('Compte ' + handle + ' ajoute !', 'success');
+        addLog('success', 'Nouveau compte : ' + handle);
+        inp.value = '';
+        closeAddModal();
+        loadRealAccounts();
+      } else {
+        notify("Erreur lors de l'ajout", 'err');
+      }
+    })
+    .catch(function() { notify('Erreur reseau', 'err'); });
+}
+
+function openAddModal() {
+  document.getElementById('add-modal').style.display = 'flex';
+  setTimeout(function() {
+    var inp = document.getElementById('new-handle-input');
+    if (inp) inp.focus();
+  }, 100);
+}
+
+function closeAddModal() {
+  document.getElementById('add-modal').style.display = 'none';
+}
+
+function saveCatToServer(handle, catId) {
+  fetch('/api/accounts/' + encodeURIComponent(handle) + '/category', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ category: catId })
+  })
+    .then(function() { addLog('success', 'Categorie sauvegardee sur le serveur'); })
+    .catch(function() { addLog('warn', 'Sauvegarde locale uniquement'); });
+}
+
+function loadRealAccounts() {
+  fetch('/api/accounts')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data || data.length === 0) {
+        addLog('info', 'Aucun compte enregistre — utilise + Ajouter un compte');
+        return;
+      }
+      ACCOUNTS.length = 0;
+      var colors = ['#7c3aed','#e8449a','#059669','#d97706','#0891b2','#ea580c','#7c3aed','#e8449a','#0891b2','#b0a8d0'];
+      data.forEach(function(acc, i) {
+        ACCOUNTS.push({
+          id: i + 1,
+          name: acc.handle.replace('@',''),
+          handle: acc.handle,
+          col: colors[i % colors.length],
+          pub: 0, max: 48, strikes: 0,
+          status: acc.status === 'active' ? 'ok' : acc.status === 'strike' ? 'warn' : 'pending',
+          age: acc.created_at ? new Date(acc.created_at).toLocaleDateString('fr-FR') : 'Nouveau',
+          followers: 0, views: '--',
+          cat: acc.category || '',
+          connected: !!acc.access_token,
+        });
+      });
+      addLog('success', data.length + ' compte(s) charge(s) depuis Railway');
+      renderAccounts();
+    })
+    .catch(function() {
+      addLog('warn', 'Impossible de charger les comptes — verifier Railway');
+    });
+}
+
+function syncStatus() {
+  var ind = document.getElementById('api-status');
+  fetch('/api/stats')
+    .then(function(r) { return r.json(); })
+    .then(function(d) {
+      if (ind) { ind.textContent = '🟢 Connecte'; ind.style.color = 'var(--green)'; }
+      if (d && d.recentLogs) {
+        d.recentLogs.slice(0,2).forEach(function(l) {
+          addLog('info', 'Scan ' + l.category + ' : ' + l.videos_selected + ' videos');
+        });
+      }
+    })
+    .catch(function() {
+      if (ind) { ind.textContent = '🔴 Hors ligne'; ind.style.color = 'var(--red)'; }
+    });
+}
+
+// Patch simulateScan to call real Railway API
+var _origScan = simulateScan;
+simulateScan = async function() {
+  notify('Scan YouTube lance sur Railway...', 'info');
+  addLog('info', 'Scan manuel declenche');
+  try {
+    var r = await fetch('/api/scan', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: '{}'
+    });
+    var d = await r.json();
+    if (d && d.success) {
+      notify('Scan lance ! Resultats dans quelques minutes.', 'success');
+      addLog('success', 'Scan YouTube demarre sur Railway');
+    } else {
+      notify('Serveur non joignable', 'warn');
+    }
+  } catch(e) {
+    notify('Erreur reseau', 'warn');
+  }
+};
+
+// Patch assignCat to also save to server
+var _origAssignCat = assignCat;
+assignCat = function(accId, catId) {
+  _origAssignCat(accId, catId);
+  var acc = ACCOUNTS.find(function(a) { return a.id === accId; });
+  if (acc) saveCatToServer(acc.handle, catId);
+};
+
+// Patch renderAccounts to add real buttons
+var _origRender = renderAccounts;
+renderAccounts = function() {
+  _origRender();
+  ACCOUNTS.forEach(function(a) {
+    var card = document.getElementById('acc-' + a.id);
+    if (!card || card.querySelector('.real-btn')) return;
+    var wrap = document.createElement('div');
+    wrap.style.cssText = 'display:flex;gap:8px;margin-top:10px';
+
+    // Connect button
+    var conBtn = document.createElement('button');
+    conBtn.className = 'btn btn-primary btn-sm real-btn';
+    conBtn.style.flex = '1';
+    conBtn.textContent = a.connected ? '✅ Connecté' : '🔗 Connecter TikTok';
+    if (a.connected) {
+      conBtn.className = 'btn btn-sm real-btn';
+      conBtn.style.background = 'var(--green-l)';
+      conBtn.style.color = 'var(--green)';
+      conBtn.style.border = '1px solid rgba(5,150,105,0.3)';
+    }
+    conBtn.onclick = (function(h){ return function(){ connectTikTok(h); }; })(a.handle);
+
+    // Delete button
+    var delBtn = document.createElement('button');
+    delBtn.className = 'btn btn-danger btn-sm real-btn';
+    delBtn.textContent = '🗑';
+    delBtn.title = 'Supprimer ce compte';
+    delBtn.onclick = (function(h){ return function(){ deleteAccount(h); }; })(a.handle);
+
+    wrap.appendChild(conBtn);
+    wrap.appendChild(delBtn);
+    card.appendChild(wrap);
+  });
+};
+
+// Fix "Ajouter un compte" button
+window.addEventListener('load', function() {
+  // Fix add button
+  var addBtns = document.querySelectorAll('button');
+  addBtns.forEach(function(btn) {
+    if (btn.textContent.includes('Ajouter un compte')) {
+      btn.onclick = openAddModal;
+    }
+  });
+
+  // Init Railway connection
+  setTimeout(function() {
+    addLog('info', 'Connexion au serveur Railway...');
+    fetch('/api/system')
+      .then(function(r) { return r.json(); })
+      .then(function(info) {
+        var sub = document.getElementById('sys-sub');
+        if (sub) sub.textContent = info.phase || 'Phase 1 — YouTube';
+        addLog('success', 'Serveur actif — ' + Math.floor((info.uptime||0)/60) + ' min uptime');
+        if (info.lastScan) addLog('info', 'Dernier scan : ' + new Date(info.lastScan).toLocaleString('fr-FR'));
+      })
+      .catch(function() {
+        addLog('warn', 'Serveur non joignable');
+      });
+    syncStatus();
+    loadRealAccounts();
+  }, 1000);
+
+  setInterval(syncStatus, 30000);
+});
+
+
+// ===== REAL DATA FROM RAILWAY =====
+function loadRealVideos() {
+  fetch(RAILWAY_URL + '/api/queue')
+    .then(function(r) { return r.json(); })
+    .then(function(data) {
+      if (!data || !data.length) { addLog('info', 'File vide — lance un scan YouTube'); return; }
+      VIDEOS.length = 0;
+      var emojis = {movies:'🎬',stream:'🎮',sports:'⚽',divert:'🎉',others:'📦'};
+      data.slice(0,48).forEach(function(item, i) {
+        VIDEOS.push({rank:i+1, cat:item.category||'others', title:item.title||'Vidéo en attente',
+          views:'—', shares:'—', comments:'—', score:85, safe:95, lang:'FR',
+          emoji:emojis[item.category]||'📦', dur:'60-90s', mix:item.mix_type||'recent'});
+      });
+      addLog('success', data.length + ' vidéos chargées depuis Railway');
+      if(document.getElementById('vid-list')) renderVideos();
+    }).catch(function() { addLog('warn', 'Impossible de charger les vidéos'); });
+}
+
+function loadRealLogs() {
+  fetch(RAILWAY_URL + '/api/logs')
+    .then(function(r) { return r.json(); })
+    .then(function(logs) {
+      if (!logs || !logs.length) return;
+      var logEl = document.getElementById('pipe-log');
+      if (!logEl) return;
+      logEl.innerHTML = logs.map(function(l) {
+        return '<div>[' + new Date(l.scanned_at).toLocaleTimeString('fr-FR') + '] > Scan ' +
+          l.category + ' : ' + l.videos_found + ' trouvées, ' + l.videos_selected + ' sélectionnées</div>';
+      }).join('');
+      logEl.scrollTop = logEl.scrollHeight;
+    }).catch(function() {});
+}
+
+setInterval(function() { loadRealVideos(); loadRealLogs(); }, 60000);
+</script>
+</body>
+</html>

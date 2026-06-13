@@ -208,7 +208,7 @@ app.get('/callback', async (req, res) => {
   if (error) return res.send('<h2>Erreur TikTok : ' + error + '</h2>');
   if (!code || !handle) return res.send('<h2>Parametres manquants</h2>');
   try {
-    const redirectUri = (process.env.APP_URL || 'https://viralbot-backend-production.up.railway.app') + '/callback/';
+    const redirectUri = (process.env.APP_URL || 'https://viralbot-backend-production.up.railway.app') + '/callback';
     const tokenData = await exchangeCodeForToken(code, redirectUri);
     if (!tokenData || !tokenData.access_token) return res.send('<h2>Echec echange token</h2>');
     dbHelpers.run(

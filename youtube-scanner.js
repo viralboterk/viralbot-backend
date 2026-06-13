@@ -8,24 +8,29 @@ const BASE_URL = 'https://www.googleapis.com/youtube/v3';
 // Category search queries
 const CATEGORY_QUERIES = {
   movies: [
-    'movie scene viral short', 'film clip incredible', 'cinema moment epic',
-    'series scene reaction', 'movie trailer reaction', 'film best scene'
+    'movie scene viral shorts', 'film clip incredible moment', 'cinema epic scene shorts',
+    'series best scene reaction', 'movie plot twist shorts', 'film emotional moment viral',
+    'actor incredible performance short', 'blockbuster scene shorts viral'
   ],
   stream: [
-    'gaming clip viral', 'streamer funny moment', 'youtube gaming short',
-    'youtuber reaction viral', 'gaming highlight short', 'twitch clip youtube'
+    'gaming clip viral shorts', 'streamer funny moment shorts', 'gaming highlight viral',
+    'youtuber reaction viral shorts', 'gamer insane play shorts', 'twitch clip viral shorts',
+    'gaming world record shorts', 'streamer goes viral shorts'
   ],
   sports: [
-    'sports highlight viral', 'football goal incredible', 'basketball dunk short',
-    'athlete incredible moment', 'sports best moment', 'sport record viral'
+    'sports highlight viral shorts', 'football goal incredible shorts', 'basketball dunk viral',
+    'athlete incredible moment short', 'sports best moment shorts', 'sport world record viral',
+    'soccer amazing goal shorts', 'nba highlight viral shorts', 'extreme sport viral shorts'
   ],
   divert: [
-    'funny viral short', 'entertainment viral video', 'comedy short viral',
-    'challenge viral', 'animal funny viral', 'pov viral short'
+    'funny viral shorts', 'comedy shorts viral', 'pov viral shorts trending',
+    'challenge viral shorts', 'animal funny viral shorts', 'satisfying video viral',
+    'unexpected funny moment shorts', 'viral trend shorts foryou', 'fail compilation shorts'
   ],
   others: [
-    'life hack viral short', 'incredible invention short', 'amazing skill viral',
-    'unexpected viral moment', 'talent show viral', 'satisfying video short'
+    'life hack viral shorts', 'incredible invention shorts', 'amazing skill viral shorts',
+    'unexpected moment viral shorts', 'talent incredible shorts', 'satisfying shorts viral',
+    'mind blowing shorts viral', 'genius idea viral shorts', 'viral shorts trending'
   ]
 };
 
@@ -40,7 +45,7 @@ async function searchShorts(query, maxResults = 20, publishedAfter = null) {
       maxResults,
       order: 'viewCount',
       key: YOUTUBE_API_KEY,
-      relevanceLanguage: 'fr',
+      // No language restriction — international content
       safeSearch: 'strict',
     };
     if (publishedAfter) params.publishedAfter = publishedAfter;
@@ -110,9 +115,16 @@ function parseDuration(iso) {
 // Simple language detection
 function detectLanguage(text) {
   const frWords = ['le', 'la', 'les', 'de', 'du', 'des', 'un', 'une', 'et', 'est', 'en', 'que', 'qui', 'dans', 'pour', 'sur', 'avec', 'par'];
+  const esWords = ['el', 'la', 'los', 'las', 'de', 'del', 'un', 'una', 'y', 'es', 'en', 'que', 'con', 'por', 'para'];
+  const ptWords = ['o', 'a', 'os', 'as', 'de', 'do', 'da', 'um', 'uma', 'e', 'em', 'que', 'com', 'por', 'para'];
   const words = text.toLowerCase().split(/\s+/);
   const frCount = words.filter(w => frWords.includes(w)).length;
-  return frCount >= 2 ? 'FR' : 'EN';
+  const esCount = words.filter(w => esWords.includes(w)).length;
+  const ptCount = words.filter(w => ptWords.includes(w)).length;
+  if (frCount >= 3) return 'FR';
+  if (esCount >= 3) return 'ES';
+  if (ptCount >= 3) return 'PT';
+  return 'EN'; // Default to English for international content
 }
 
 // Filter videos by duration (60-90 seconds)
@@ -122,7 +134,11 @@ function filterByDuration(videos) {
 
 // Copyright safety check (basic heuristics)
 function copyrightSafetyCheck(video) {
-  const riskyChannels = ['vevo', 'universal music', 'warner', 'sony music', 'umg', 'disney'];
+  const riskyChannels = [
+    'vevo', 'universal music', 'warner', 'sony music', 'umg', 'disney',
+    'official music video', 'records', 'entertainment official',
+    'columbia records', 'atlantic records', 'republic records'
+  ];
   const channelLower = video.channelTitle.toLowerCase();
   if (riskyChannels.some(r => channelLower.includes(r))) return false;
 
