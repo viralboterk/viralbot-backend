@@ -54,6 +54,11 @@ async function searchShorts(query, maxResults = 20, publishedAfter = null) {
     const videoIds = res.data.items.map(item => item.id.videoId).filter(Boolean);
     return videoIds;
   } catch (err) {
+    const status = err.response && err.response.status;
+    if (status === 429) {
+      logger.error('YouTube API quota exceeded (429) — stopping scan');
+      throw new Error('QUOTA_EXCEEDED');
+    }
     logger.error(`YouTube search error [${query}]: ${err.message}`);
     return [];
   }
@@ -152,6 +157,10 @@ function copyrightSafetyCheck(video) {
 
 // Main scan function for one category
 async function scanCategory(category, type = 'both') {
+  if (!YOUTUBE_API_KEY) {
+    logger.error('YOUTUBE_API_KEY not set');
+    return { recent: [], evergreen: [] };
+  }
   logger.info(`Scanning category: ${category} [${type}]`);
   const queries = CATEGORY_QUERIES[category] || CATEGORY_QUERIES.others;
   const results = { recent: [], evergreen: [] };
