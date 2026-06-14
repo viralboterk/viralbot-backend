@@ -1,228 +1,276 @@
-const initSqlJs = require('sql.js');
-const fs = require('fs');
-const path = require('path');
+const { Pool } = require('pg');
+const logger = require('./logger');
 
-const DB_PATH = path.join(__dirname, 'viralbot.db');
+// PostgreSQL connection pool
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('railway')
+    ? { rejectUnauthorized: false }
+    : false,
+});
 
-let db;
-let SQL;
+// =====================
+// CORE HELPERS
+// =====================
 
-// Save DB to disk
-function saveDb() {
-  const data = db.export();
-  fs.writeFileSync(DB_PATH, Buffer.from(data));
+async function run(sql, params = []) {
+  const client = await pool.connect();
+  try {
+    await client.query(sql, params);
+  } finally {
+    client.release();
+  }
 }
 
-// Auto-save every 30 seconds
-setInterval(saveDb, 30000);
+async function get(sql, params = []) {
+  const client = await pool.connect();
+  try {
+    const res = await client.query(sql, params);
+    return res.rows[0] || null;
+  } finally {
+    client.release();
+  }
+}
 
-// Initialize database
+async function all(sql, params = []) {
+  const client = await pool.connect();
+  try {
+    const res = await client.query(sql, params);
+    return res.rows;
+  } finally {
+    client.release();
+  }
+}
+
+// =====================
+// INIT DATABASE
+// =====================
+
 async function initDb() {
-  SQL = await initSqlJs();
+  const client = await pool.connect();
+  try {
+    await client.query(`
+      CREATE TABLE IF NOT EXISTS accounts (
+        id SERIAL PRIMARY KEY,
+        handle TEXT NOT NULL UNIQUE,
+        category TEXT,
+        access_token TEXT,
+        refresh_token TEXT,
+        status TEXT DEFAULT 'pending',
+        daily_count INTEGER DEFAULT 0,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
 
-  if (fs.existsSync(DB_PATH)) {
-    const fileBuffer = fs.readFileSync(DB_PATH);
-    db = new SQL.Database(fileBuffer);
-  } else {
-    db = new SQL.Database();
+      CREATE TABLE IF NOT EXISTS published_videos (
+        id SERIAL PRIMARY KEY,
+        video_id TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        category TEXT NOT NULL,
+        title TEXT,
+        published_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(video_id, account_id)
+      );
+
+      CREATE TABLE IF NOT EXISTS video_queue (
+        id SERIAL PRIMARY KEY,
+        video_id TEXT NOT NULL,
+        account_id TEXT NOT NULL,
+        category TEXT NOT NULL,
+        mix_type TEXT NOT NULL,
+        title TEXT,
+        description TEXT,
+        tags TEXT,
+        r2_url TEXT,
+        status TEXT DEFAULT 'pending',
+        scheduled_at TIMESTAMPTZ,
+        published_at TIMESTAMPTZ,
+        created_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS scan_log (
+        id SERIAL PRIMARY KEY,
+        category TEXT NOT NULL,
+        videos_found INTEGER DEFAULT 0,
+        videos_selected INTEGER DEFAULT 0,
+        videos_rejected INTEGER DEFAULT 0,
+        scanned_at TIMESTAMPTZ DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS scanned_videos (
+        id SERIAL PRIMARY KEY,
+        video_id TEXT NOT NULL,
+        category TEXT NOT NULL,
+        mix_type TEXT NOT NULL,
+        title TEXT,
+        channel TEXT,
+        views INTEGER DEFAULT 0,
+        likes INTEGER DEFAULT 0,
+        comments INTEGER DEFAULT 0,
+        duration INTEGER DEFAULT 0,
+        score INTEGER DEFAULT 0,
+        thumbnail TEXT,
+        lang TEXT DEFAULT 'EN',
+        scanned_at TIMESTAMPTZ DEFAULT NOW(),
+        UNIQUE(video_id, category)
+      );
+
+      CREATE TABLE IF NOT EXISTS system_stats (
+        id SERIAL PRIMARY KEY,
+        key TEXT UNIQUE,
+        value TEXT,
+        updated_at TIMESTAMPTZ DEFAULT NOW()
+      );
+    `);
+    logger.info('PostgreSQL database initialized');
+  } finally {
+    client.release();
   }
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS published_videos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      video_id TEXT NOT NULL,
-      account_id TEXT NOT NULL,
-      category TEXT NOT NULL,
-      title TEXT,
-      published_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(video_id, account_id)
-    );
-
-    CREATE TABLE IF NOT EXISTS accounts (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      handle TEXT NOT NULL UNIQUE,
-      category TEXT,
-      access_token TEXT,
-      refresh_token TEXT,
-      status TEXT DEFAULT 'pending',
-      daily_count INTEGER DEFAULT 0,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS video_queue (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      video_id TEXT NOT NULL,
-      account_id TEXT NOT NULL,
-      category TEXT NOT NULL,
-      mix_type TEXT NOT NULL,
-      title TEXT,
-      description TEXT,
-      tags TEXT,
-      r2_url TEXT,
-      status TEXT DEFAULT 'pending',
-      scheduled_at DATETIME,
-      published_at DATETIME,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    CREATE TABLE IF NOT EXISTS scan_log (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      category TEXT NOT NULL,
-      videos_found INTEGER DEFAULT 0,
-      videos_selected INTEGER DEFAULT 0,
-      videos_rejected INTEGER DEFAULT 0,
-      scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-
-    
-    CREATE TABLE IF NOT EXISTS scanned_videos (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      video_id TEXT NOT NULL,
-      category TEXT NOT NULL,
-      mix_type TEXT NOT NULL,
-      title TEXT,
-      channel TEXT,
-      views INTEGER DEFAULT 0,
-      likes INTEGER DEFAULT 0,
-      comments INTEGER DEFAULT 0,
-      duration INTEGER DEFAULT 0,
-      score INTEGER DEFAULT 0,
-      thumbnail TEXT,
-      lang TEXT DEFAULT 'EN',
-      scanned_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(video_id, category)
-    );
-    CREATE TABLE IF NOT EXISTS system_stats (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      key TEXT UNIQUE,
-      value TEXT,
-      updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
-    );
-  `);
-
-  saveDb();
-  return db;
 }
 
-// Helper: run query and return all rows
-function all(sql, params = []) {
-  const stmt = db.prepare(sql);
-  stmt.bind(params);
-  const rows = [];
-  while (stmt.step()) {
-    rows.push(stmt.getAsObject());
-  }
-  stmt.free();
-  return rows;
-}
-
-// Helper: run query and return first row
-function get(sql, params = []) {
-  const rows = all(sql, params);
-  return rows[0] || null;
-}
-
-// Helper: run insert/update/delete
-function run(sql, params = []) {
-  db.run(sql, params);
-  saveDb();
-}
+// =====================
+// DB HELPERS
+// =====================
 
 const dbHelpers = {
-  isPublished: (videoId, accountId) => {
-    return !!get('SELECT id FROM published_videos WHERE video_id = ? AND account_id = ?', [videoId, accountId]);
+
+  // ── ACCOUNTS ──────────────────────────────────────────────
+  getAllActiveAccounts: async () => {
+    return all(
+      "SELECT * FROM accounts WHERE status = 'active' AND access_token IS NOT NULL"
+    );
   },
 
-  markPublished: (videoId, accountId, category, title) => {
-    run('INSERT OR IGNORE INTO published_videos (video_id, account_id, category, title) VALUES (?, ?, ?, ?)',
-      [videoId, accountId, category, title]);
+  updateAccount: async (handle, fields) => {
+    const keys = Object.keys(fields);
+    const values = Object.values(fields);
+    const setClause = keys.map((k, i) => `${k} = $${i + 1}`).join(', ');
+    await run(
+      `UPDATE accounts SET ${setClause} WHERE handle = $${keys.length + 1}`,
+      [...values, handle]
+    );
   },
 
-  getAccountsByCategory: (category) => {
-    return all("SELECT * FROM accounts WHERE category = ? AND status = 'active' AND access_token IS NOT NULL", [category]);
+  // ── PUBLISHED VIDEOS ──────────────────────────────────────
+  isPublished: async (videoId, accountId) => {
+    const row = await get(
+      'SELECT id FROM published_videos WHERE video_id = $1 AND account_id = $2',
+      [videoId, accountId]
+    );
+    return !!row;
   },
 
-  getAllActiveAccounts: () => {
-    return all("SELECT * FROM accounts WHERE status = 'active' AND access_token IS NOT NULL");
+  markPublished: async (videoId, accountId, category, title) => {
+    await run(
+      'INSERT INTO published_videos (video_id, account_id, category, title) VALUES ($1, $2, $3, $4) ON CONFLICT (video_id, account_id) DO NOTHING',
+      [videoId, accountId, category, title]
+    );
   },
 
-  updateAccount: (handle, data) => {
-    const fields = Object.keys(data).map(k => `${k} = ?`).join(', ');
-    const values = [...Object.values(data), handle];
-    run(`UPDATE accounts SET ${fields} WHERE handle = ?`, values);
+  getTodayCount: async (accountId) => {
+    const row = await get(
+      'SELECT COUNT(*) as cnt FROM published_videos WHERE account_id = $1 AND published_at::date = CURRENT_DATE',
+      [accountId]
+    );
+    return row ? parseInt(row.cnt) : 0;
   },
 
-  addToQueue: (item) => {
-    run(`INSERT INTO video_queue (video_id, account_id, category, mix_type, title, description, tags, r2_url, scheduled_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+  // ── VIDEO QUEUE ───────────────────────────────────────────
+  addToQueue: async (item) => {
+    await run(
+      `INSERT INTO video_queue (video_id, account_id, category, mix_type, title, description, tags, r2_url, scheduled_at)
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
       [item.videoId, item.accountId, item.category, item.mixType,
-       item.title, item.description, item.tags, item.r2Url, item.scheduledAt]);
+       item.title, item.description, item.tags, item.r2Url, item.scheduledAt]
+    );
   },
 
-  getPendingQueue: (accountId) => {
-    return all("SELECT * FROM video_queue WHERE account_id = ? AND status = 'pending' ORDER BY scheduled_at ASC", [accountId]);
+  getPendingQueue: async (accountId) => {
+    return all(
+      "SELECT * FROM video_queue WHERE account_id = $1 AND status = 'pending' ORDER BY scheduled_at ASC",
+      [accountId]
+    );
   },
 
-  markQueueDone: (id, status) => {
-    run('UPDATE video_queue SET status = ?, published_at = datetime("now") WHERE id = ?', [status, id]);
+  markQueueDone: async (id, status) => {
+    await run(
+      'UPDATE video_queue SET status = $1, published_at = NOW() WHERE id = $2',
+      [status, id]
+    );
   },
 
-  logScan: (category, found, selected, rejected) => {
-    run('INSERT INTO scan_log (category, videos_found, videos_selected, videos_rejected) VALUES (?, ?, ?, ?)',
-      [category, found, selected, rejected]);
+  // ── SCAN LOG ──────────────────────────────────────────────
+  logScan: async (category, found, selected, rejected) => {
+    await run(
+      'INSERT INTO scan_log (category, videos_found, videos_selected, videos_rejected) VALUES ($1, $2, $3, $4)',
+      [category, found, selected, rejected]
+    );
   },
 
-  getStat: (key) => {
-    const row = get('SELECT value FROM system_stats WHERE key = ?', [key]);
-    return row ? row.value : null;
-  },
-
-  setStat: (key, value) => {
-    run('INSERT OR REPLACE INTO system_stats (key, value, updated_at) VALUES (?, ?, datetime("now"))', [key, String(value)]);
-  },
-
-  getTodayCount: (accountId) => {
-    const row = get("SELECT COUNT(*) as cnt FROM published_videos WHERE account_id = ? AND DATE(published_at) = DATE('now')", [accountId]);
-    return row ? row.cnt : 0;
-  },
-
-  getDashboardStats: () => {
-    const totalPublished = get("SELECT COUNT(*) as cnt FROM published_videos WHERE DATE(published_at) = DATE('now')");
-    const totalQueue = get("SELECT COUNT(*) as cnt FROM video_queue WHERE status = 'pending'");
-    const lastScan = get('SELECT * FROM scan_log ORDER BY scanned_at DESC LIMIT 1');
-    const accounts = all('SELECT * FROM accounts');
-    return {
-      totalPublished: totalPublished?.cnt || 0,
-      totalQueue: totalQueue?.cnt || 0,
-      lastScan,
-      accounts,
-    };
-  },
-
-  
-  saveScannedVideos: (category, videos, mixType) => {
-    videos.forEach(function(v) {
+  // ── SCANNED VIDEOS ────────────────────────────────────────
+  saveScannedVideos: async (category, videos, mixType) => {
+    for (const v of videos) {
       try {
-        run('INSERT OR REPLACE INTO scanned_videos (video_id, category, mix_type, title, channel, views, likes, comments, duration, score, thumbnail, lang) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-          [v.id, category, mixType, v.title, v.channelTitle, v.views || 0, v.likes || 0, v.comments || 0, v.duration || 0, v.score || 0, v.thumbnail || '', v.lang || 'EN']);
-      } catch(e) {}
-    });
+        await run(
+          `INSERT INTO scanned_videos (video_id, category, mix_type, title, channel, views, likes, comments, duration, score, thumbnail, lang)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+           ON CONFLICT (video_id, category) DO UPDATE SET
+             title = EXCLUDED.title, views = EXCLUDED.views, score = EXCLUDED.score,
+             scanned_at = NOW()`,
+          [v.id, category, mixType, v.title, v.channelTitle,
+           v.views || 0, v.likes || 0, v.comments || 0,
+           v.duration || 0, v.score || 0, v.thumbnail || '', v.lang || 'EN']
+        );
+      } catch (e) {
+        logger.error('saveScannedVideos error: ' + e.message);
+      }
+    }
   },
 
-  getScannedVideos: (category, mixType, limit) => {
+  getScannedVideos: async (category, mixType, limit) => {
     let sql = 'SELECT * FROM scanned_videos WHERE 1=1';
     const params = [];
-    if (category) { sql += ' AND category = ?'; params.push(category); }
-    if (mixType) { sql += ' AND mix_type = ?'; params.push(mixType); }
-    sql += ' ORDER BY score DESC, scanned_at DESC LIMIT ?';
+    if (category) { params.push(category); sql += ` AND category = $${params.length}`; }
+    if (mixType) { params.push(mixType); sql += ` AND mix_type = $${params.length}`; }
     params.push(limit || 240);
+    sql += ` ORDER BY score DESC, scanned_at DESC LIMIT $${params.length}`;
     return all(sql, params);
   },
 
-// Raw helpers for API routes
-  all,
-  get,
+  // ── SYSTEM STATS ──────────────────────────────────────────
+  getStat: async (key) => {
+    const row = await get('SELECT value FROM system_stats WHERE key = $1', [key]);
+    return row ? row.value : null;
+  },
+
+  setStat: async (key, value) => {
+    await run(
+      'INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()',
+      [key, value]
+    );
+  },
+
+  // ── DASHBOARD STATS ───────────────────────────────────────
+  getDashboardStats: async () => {
+    const totalScanned = await get('SELECT COUNT(*) as cnt FROM scanned_videos');
+    const totalSelected = await get('SELECT COUNT(*) as cnt FROM video_queue');
+    const publishedToday = await get(
+      "SELECT COUNT(*) as cnt FROM published_videos WHERE published_at::date = CURRENT_DATE"
+    );
+    const strikes = await get(
+      "SELECT COUNT(*) as cnt FROM accounts WHERE status = 'strike'"
+    );
+    return {
+      totalScanned: totalScanned ? parseInt(totalScanned.cnt) : 0,
+      totalSelected: totalSelected ? parseInt(totalSelected.cnt) : 0,
+      publishedToday: publishedToday ? parseInt(publishedToday.cnt) : 0,
+      activeStrikes: strikes ? parseInt(strikes.cnt) : 0,
+    };
+  },
+
+  // ── RAW ACCESS ────────────────────────────────────────────
   run,
+  get,
+  all,
 };
 
-module.exports = { initDb, dbHelpers, saveDb };
+module.exports = { initDb, dbHelpers, pool };

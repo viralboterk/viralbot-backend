@@ -22,14 +22,14 @@ app.use((req, res, next) => {
 });
 
 // =====================
-app.get('/.well-known/tiktok-site-verification', (req, res) => {
+app.get('/.well-known/tiktok-site-verification', async (req, res) => {
   res.send('tiktok-developers-site-verification=VYFb5YJKJVo8yY0IOW4rhPFZqFw5QZBk');
 });
 
 
 
 // Terms and Privacy pages
-app.get('/terms', (req, res) => {
+app.get('/terms', async (req, res) => {
   res.type('text/html').send(`<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><title>ViralBot — Terms of Service</title>
@@ -51,7 +51,7 @@ app.get('/terms', (req, res) => {
 </body></html>`);
 });
 
-app.get('/privacy', (req, res) => {
+app.get('/privacy', async (req, res) => {
   res.type('text/html').send(`<!DOCTYPE html>
 <html>
 <head><meta charset="UTF-8"><title>ViralBot — Privacy Policy</title>
@@ -86,16 +86,16 @@ app.use('/api', (req, res, next) => {
 // =====================
 // TIKTOK DOMAIN VERIFICATION
 // =====================
-app.get('/tiktok-site-verification', (req, res) => {
+app.get('/tiktok-site-verification', async (req, res) => {
   res.type('text/plain').send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
 });
-app.get('/tiktok-site-verification.txt', (req, res) => {
+app.get('/tiktok-site-verification.txt', async (req, res) => {
   res.type('text/plain').send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
 });
-app.get('/.well-known/tiktok-site-verification', (req, res) => {
+app.get('/.well-known/tiktok-site-verification', async (req, res) => {
   res.type('text/plain').send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
 });
-app.get('/.well-known/tiktok-site-verification.txt', (req, res) => {
+app.get('/.well-known/tiktok-site-verification.txt', async (req, res) => {
   res.type('text/plain').send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
 });
 
@@ -107,19 +107,19 @@ app.get('/.well-known/tiktok-site-verification.txt', (req, res) => {
 
 // 1. Web/Desktop URL: https://viralbot-backend-production.up.railway.app
 // TikTok checks: /tiktokeM7Hxpz9Fu27SQUseqTtmmoJipyslPko.txt
-app.get('/tiktokeM7Hxpz9Fu27SQUseqTtmmoJipyslPko.txt', (req, res) => {
+app.get('/tiktokeM7Hxpz9Fu27SQUseqTtmmoJipyslPko.txt', async (req, res) => {
   res.type('text/plain').send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
 });
 
 // 2. Terms URL: https://viralbot-backend-production.up.railway.app/terms
 // TikTok checks: /terms/tiktoktVSrL4owGEeF5xkkuwe3L9NGt6wwG57o.txt
-app.get('/terms/tiktoktVSrL4owGEeF5xkkuwe3L9NGt6wwG57o.txt', (req, res) => {
+app.get('/terms/tiktoktVSrL4owGEeF5xkkuwe3L9NGt6wwG57o.txt', async (req, res) => {
   res.type('text/plain').send('tiktok-developers-site-verification=tVSrL4owGEeF5xkkuwe3L9NGt6wwG57o');
 });
 
 // 3. Privacy URL: https://viralbot-backend-production.up.railway.app/privacy
 // TikTok checks: /privacy/tiktokHPEyP82J2tRXQBfFlktcfNVOs0tCWX64.txt
-app.get('/privacy/tiktoktHPEyP82J2tRXQBfFlktcfNVOs0tCWX64.txt', (req, res) => {
+app.get('/privacy/tiktoktHPEyP82J2tRXQBfFlktcfNVOs0tCWX64.txt', async (req, res) => {
   res.type('text/plain').send('tiktok-developers-site-verification=HPEyP82J2tRXQBfFlktcfNVOs0tCWX64');
 });
 
@@ -127,41 +127,41 @@ app.get('/privacy/tiktoktHPEyP82J2tRXQBfFlktcfNVOs0tCWX64.txt', (req, res) => {
 // API ROUTES
 // =====================
 
-app.get('/tiktok-developers-site-verification.txt', (req, res) => {
+app.get('/tiktok-developers-site-verification.txt', async (req, res) => {
   res.type('text/plain').send('tiktok-developers-site-verification=eM7Hxpz9Fu27SQUseqTtmmoJipyslPko');
 });
 
-app.get('/health', (req, res) => {
+app.get('/health', async (req, res) => {
   res.json({ status: 'ok', version: '1.0.0', timestamp: new Date().toISOString() });
 });
 
-app.get('/api/stats', (req, res) => {
+app.get('/api/stats', async (req, res) => {
   try {
-    const stats = dbHelpers.getDashboardStats();
-    const accounts = dbHelpers.all('SELECT * FROM accounts');
-    const recentLogs = dbHelpers.all('SELECT * FROM scan_log ORDER BY scanned_at DESC LIMIT 10');
-    const recentPublished = dbHelpers.all('SELECT * FROM published_videos ORDER BY published_at DESC LIMIT 20');
+    const stats = await dbHelpers.getDashboardStats();
+    const accounts = await dbHelpers.all('SELECT * FROM accounts');
+    const recentLogs = await dbHelpers.all('SELECT * FROM scan_log ORDER BY scanned_at DESC LIMIT 10');
+    const recentPublished = await dbHelpers.all('SELECT * FROM published_videos ORDER BY published_at DESC LIMIT 20');
     res.json({ stats, accounts, recentLogs, recentPublished, uptime: process.uptime() });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/accounts', (req, res) => {
+app.get('/api/accounts', async (req, res) => {
   try {
-    const accounts = dbHelpers.all('SELECT * FROM accounts');
+    const accounts = await dbHelpers.all('SELECT * FROM accounts');
     res.json(accounts);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.post('/api/accounts', (req, res) => {
+app.post('/api/accounts', async (req, res) => {
   const { handle, category } = req.body;
   if (!handle) return res.status(400).json({ error: 'handle required' });
   try {
-    dbHelpers.run('INSERT OR IGNORE INTO accounts (handle, category) VALUES (?, ?)', [handle, category || null]);
-    if (category) dbHelpers.run('UPDATE accounts SET category = ? WHERE handle = ?', [category, handle]);
+    await dbHelpers.run('INSERT INTO accounts (handle, category) VALUES ($1, $2) ON CONFLICT (handle) DO NOTHING', [handle, category || null]);
+    if (category) await dbHelpers.run('UPDATE accounts SET category = $1 WHERE handle = $2', [category, handle]);
     logger.info('Account added: ' + handle);
     res.json({ success: true });
   } catch (err) {
@@ -169,11 +169,11 @@ app.post('/api/accounts', (req, res) => {
   }
 });
 
-app.delete('/api/accounts/:handle', (req, res) => {
+app.delete('/api/accounts/:handle', async (req, res) => {
   const handle = req.params.handle;
   try {
-    dbHelpers.run('DELETE FROM accounts WHERE handle = ?', [handle]);
-    dbHelpers.run('DELETE FROM video_queue WHERE account_id = ?', [handle]);
+    await dbHelpers.run('DELETE FROM accounts WHERE handle = $1', [handle]);
+    await dbHelpers.run('DELETE FROM video_queue WHERE account_id = $1', [handle]);
     logger.info('Account deleted: ' + handle);
     res.json({ success: true });
   } catch (err) {
@@ -181,11 +181,11 @@ app.delete('/api/accounts/:handle', (req, res) => {
   }
 });
 
-app.put('/api/accounts/:handle/category', (req, res) => {
+app.put('/api/accounts/:handle/category', async (req, res) => {
   const handle = req.params.handle;
   const { category } = req.body;
   try {
-    dbHelpers.run('UPDATE accounts SET category = ? WHERE handle = ?', [category, handle]);
+    await dbHelpers.run('UPDATE accounts SET category = $1 WHERE handle = $2', [category, handle]);
     logger.info('Category assigned to ' + handle + ': ' + category);
     res.json({ success: true });
   } catch (err) {
@@ -193,18 +193,18 @@ app.put('/api/accounts/:handle/category', (req, res) => {
   }
 });
 
-app.put('/api/accounts/:handle/status', (req, res) => {
+app.put('/api/accounts/:handle/status', async (req, res) => {
   const handle = req.params.handle;
   const { status } = req.body;
   try {
-    dbHelpers.run('UPDATE accounts SET status = ? WHERE handle = ?', [status, handle]);
+    await dbHelpers.run('UPDATE accounts SET status = $1 WHERE handle = $2', [status, handle]);
     res.json({ success: true });
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/tiktok/connect/:handle', (req, res) => {
+app.get('/api/tiktok/connect/:handle', async (req, res) => {
   const handle = req.params.handle;
   const oauthUrl = getOAuthUrl(handle);
   res.json({ url: oauthUrl });
@@ -221,8 +221,8 @@ app.get('/callback', async (req, res) => {
     const redirectUri = (process.env.APP_URL || 'https://viralbot-backend-production.up.railway.app') + '/callback';
     const tokenData = await exchangeCodeForToken(code, redirectUri);
     if (!tokenData || !tokenData.access_token) return res.send('<h2>Echec echange token</h2>');
-    dbHelpers.run(
-      "INSERT OR REPLACE INTO accounts (handle, access_token, refresh_token, status) VALUES (?, ?, ?, 'active')",
+    await dbHelpers.run(
+      "INSERT INTO accounts (handle, access_token, refresh_token, status) VALUES ($1, $2, $3, 'active') ON CONFLICT (handle) DO UPDATE SET access_token = $2, refresh_token = $3, status = 'active'",
       [handle, tokenData.access_token, tokenData.refresh_token]
     );
     logger.info('TikTok account connected: ' + handle);
@@ -244,27 +244,27 @@ app.post('/api/scan', async (req, res) => {
   }
 });
 
-app.get('/api/queue', (req, res) => {
+app.get('/api/queue', async (req, res) => {
   try {
-    res.json(dbHelpers.all('SELECT * FROM video_queue ORDER BY scheduled_at ASC LIMIT 100'));
+    res.json(await dbHelpers.all('SELECT * FROM video_queue ORDER BY scheduled_at ASC LIMIT 100'));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/logs', (req, res) => {
+app.get('/api/logs', async (req, res) => {
   try {
-    res.json(dbHelpers.all('SELECT * FROM scan_log ORDER BY scanned_at DESC LIMIT 50'));
+    res.json(await dbHelpers.all('SELECT * FROM scan_log ORDER BY scanned_at DESC LIMIT 50'));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.delete('/api/accounts/:handle', (req, res) => {
+app.delete('/api/accounts/:handle', async (req, res) => {
   const handle = req.params.handle;
   try {
-    dbHelpers.run('DELETE FROM accounts WHERE handle = ?', [handle]);
-    dbHelpers.run('DELETE FROM video_queue WHERE account_id = ?', [handle]);
+    await dbHelpers.run('DELETE FROM accounts WHERE handle = $1', [handle]);
+    await dbHelpers.run('DELETE FROM video_queue WHERE account_id = $1', [handle]);
     logger.info('Account deleted: ' + handle);
     res.json({ success: true });
   } catch (err) {
@@ -274,11 +274,11 @@ app.delete('/api/accounts/:handle', (req, res) => {
 
 
 // Delete account
-app.delete(`/api/accounts/:handle`, (req, res) => {
+app.delete(`/api/accounts/:handle`, async (req, res) => {
   const handle = req.params.handle;
   try {
-    dbHelpers.run(`DELETE FROM accounts WHERE handle = ?`, [handle]);
-    dbHelpers.run(`DELETE FROM video_queue WHERE account_id = ?`, [handle]);
+    await dbHelpers.run(`DELETE FROM accounts WHERE handle = $1`, [handle]);
+    await dbHelpers.run(`DELETE FROM video_queue WHERE account_id = $1`, [handle]);
     logger.info(`Account deleted: ` + handle);
     res.json({ success: true });
   } catch (err) {
@@ -288,23 +288,23 @@ app.delete(`/api/accounts/:handle`, (req, res) => {
 
 
 // Get videos for Top 48 display (from scanned_videos table)
-app.get('/api/videos', (req, res) => {
+app.get('/api/videos', async (req, res) => {
   try {
     const category = req.query.category || null;
     const mixType = req.query.mix || null;
-    const videos = dbHelpers.getScannedVideos(category, mixType, 240);
+    const videos = await dbHelpers.getScannedVideos(category, mixType, 240);
     res.json(videos);
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
 });
 
-app.get('/api/system', (req, res) => {
+app.get('/api/system', async (req, res) => {
   res.json({
     version: '1.0.0',
     phase: 'Phase 1 — YouTube uniquement',
     uptime: Math.floor(process.uptime()),
-    lastScan: dbHelpers.getStat('last_scan'),
+    lastScan: await dbHelpers.getStat('last_scan'),
     categories: ['movies', 'stream', 'sports', 'divert', 'others'],
     schedule: '06:00 -> 22:00 - 1 video / 20 min - 48/jour/compte',
   });
@@ -327,7 +327,7 @@ async function start() {
       // Only scan if not already done today — avoids wasting YouTube quota on restarts
       setTimeout(async () => {
         try {
-          const lastScan = dbHelpers.getStat('last_scan');
+          const lastScan = await dbHelpers.getStat('last_scan');
           const today = new Date().toDateString();
           const lastScanDate = lastScan ? new Date(lastScan).toDateString() : null;
           if (lastScanDate === today) {
@@ -338,8 +338,8 @@ async function start() {
           const results = await scanAllCategories();
           const { buildDailyQueue } = require('./scheduler');
           await buildDailyQueue(results);
-          dbHelpers.run(
-            "INSERT OR REPLACE INTO system_stats (key, value) VALUES ('last_scan', ?)",
+          await dbHelpers.run(
+            "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()'last_scan', ?)",
             [new Date().toISOString()]
           );
           logger.info('Initial scan complete');

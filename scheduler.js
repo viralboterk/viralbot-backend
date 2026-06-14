@@ -15,24 +15,24 @@ function randomDelay() {
 // Refresh TikTok token if needed before publishing
 
 // Track quota exhaustion — persisted in DB to survive restarts
-function markQuotaExhausted() {
+async function markQuotaExhausted() {
   const midnight = new Date();
   midnight.setUTCHours(24, 0, 0, 0);
-  dbHelpers.run(
-    "INSERT OR REPLACE INTO system_stats (key, value) VALUES ('quota_exhausted_until', ?)",
-    [midnight.toISOString()]
+  await dbHelpers.run(
+    "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
+    ['quota_exhausted_until', midnight.toISOString()]
   );
   logger.warn('YouTube quota exhausted — scans paused until ' + midnight.toISOString());
 }
 
-function isQuotaAvailable() {
+async function isQuotaAvailable() {
   try {
-    const val = dbHelpers.getStat('quota_exhausted_until');
+    const val = await dbHelpers.getStat('quota_exhausted_until');
     if (!val) return true;
     const resetTime = new Date(val);
     if (new Date() > resetTime) {
       // Quota reset — clear the flag
-      dbHelpers.run("DELETE FROM system_stats WHERE key = 'quota_exhausted_until'");
+      await dbHelpers.run("DELETE FROM system_stats WHERE key = 'quota_exhausted_until'");
       logger.info('YouTube quota reset — scans resuming');
       return true;
     }
@@ -48,7 +48,7 @@ async function ensureValidToken(account) {
     const { refreshToken } = require('./tiktok-publisher');
     const newTokenData = await refreshToken(account.refresh_token);
     if (newTokenData && newTokenData.access_token) {
-      dbHelpers.run(
+      await dbHelpers.run(
         "UPDATE accounts SET access_token = ?, refresh_token = ?, status = 'active' WHERE handle = ?",
         [newTokenData.access_token, newTokenData.refresh_token || account.refresh_token, account.handle]
       );
@@ -66,7 +66,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 // Build daily queue for all accounts
 async function buildDailyQueue(scanResults) {
   logger.info('Building daily queue for all accounts');
-  const accounts = dbHelpers.getAllActiveAccounts();
+  const accounts = await dbHelpers.getAllActiveAccounts();
 
   for (let account of accounts) {
     if (!account.category) {
@@ -85,7 +85,11 @@ async function buildDailyQueue(scanResults) {
     ];
 
     // Filter out already published
-    const newVideos = allVideos.filter(v => !dbHelpers.isPublished(v.id, account.handle));
+    // Check published status async before filtering
+    const publishedChecks = await Promise.all(
+      allVideos.map(v => dbHelpers.isPublished(v.id, account.handle))
+    );
+    const newVideos = allVideos.filter((v, i) => !publishedChecks[i]);
 
     // Take up to 48
     const selected = newVideos.slice(0, 48);
@@ -127,7 +131,7 @@ async function buildDailyQueue(scanResults) {
       const randomSeconds = Math.floor(Math.random() * 120); // 0-120s random offset
       const scheduledAt = new Date(scheduleTime.getTime() + randomSeconds * 1000);
 
-      dbHelpers.addToQueue({
+      await dbHelpers.addToQueue({
         videoId: video.id,
         accountId: account.handle,
         category: account.category,
@@ -154,10 +158,10 @@ async function processQueue() {
   // Only publish between 06:00 and 22:00
   if (hour < 6 || hour >= 22) return;
 
-  const accounts = dbHelpers.getAllActiveAccounts();
+  const accounts = await dbHelpers.getAllActiveAccounts();
 
   for (let account of accounts) {
-    const queue = dbHelpers.getPendingQueue(account.handle);
+    const queue = await dbHelpers.getPendingQueue(account.handle);
     const dueItems = queue.filter(item => new Date(item.scheduled_at) <= now);
 
     for (const item of dueItems.slice(0, 2)) { // Max 2 per cycle per account
@@ -166,7 +170,7 @@ async function processQueue() {
         account = await ensureValidToken(account);
 
         // Check daily limit (48 max)
-        const todayCount = dbHelpers.getTodayCount(account.handle);
+        const todayCount = await dbHelpers.getTodayCount(account.handle);
         if (todayCount >= 48) {
           logger.warn(`${account.handle} reached daily limit (48)`);
           break;
@@ -184,12 +188,12 @@ async function processQueue() {
         }
         if (!r2Url) {
           logger.error('Could not get R2 URL for ' + item.video_id + ' — skipping');
-          dbHelpers.markQueueDone(item.id, 'failed');
+          await dbHelpers.markQueueDone(item.id, 'failed');
           continue;
         }
 
         // Update queue item with R2 URL
-        dbHelpers.run('UPDATE video_queue SET r2_url = ? WHERE id = ?', [r2Url, item.id]);
+        await dbHelpers.run('UPDATE video_queue SET r2_url = $1 WHERE id = $2', [r2Url, item.id]);
 
         // Step 2: Publish to TikTok with real R2 URL
         const result = await publishVideo(account, {
@@ -199,20 +203,20 @@ async function processQueue() {
         });
 
         if (result.success) {
-          dbHelpers.markPublished(item.video_id, account.handle, item.category, item.title);
-          dbHelpers.markQueueDone(item.id, 'published');
+          await dbHelpers.markPublished(item.video_id, account.handle, item.category, item.title);
+          await dbHelpers.markQueueDone(item.id, 'published');
           // Clean up R2 after successful publish
           const r2Key = 'videos/' + item.category + '/' + item.video_id + '.mp4';
           setTimeout(() => deleteFromR2(r2Key), 60000); // Delete after 1 min
           logger.info('✅ Published: ' + item.title + ' → ' + account.handle);
         } else {
-          dbHelpers.markQueueDone(item.id, 'failed');
+          await dbHelpers.markQueueDone(item.id, 'failed');
           logger.error('❌ Failed: ' + item.title + ' → ' + account.handle);
         }
 
       } catch (err) {
         logger.error(`Queue processing error: ${err.message}`);
-        dbHelpers.markQueueDone(item.id, 'error');
+        await dbHelpers.markQueueDone(item.id, 'error');
       }
     }
   }
@@ -238,8 +242,9 @@ function initScheduler() {
   // Process queue every 5 minutes (06:00–22:00)
   cron.schedule('*/5 6-21 * * *', async () => {
     // If queue is empty, trigger a scan (only if quota available)
-    if (isQuotaAvailable()) {
-      const pendingCount = dbHelpers.all("SELECT COUNT(*) as cnt FROM video_queue WHERE status = 'pending'")[0];
+    if (await isQuotaAvailable()) {
+      const pendingRows = await dbHelpers.all("SELECT COUNT(*) as cnt FROM video_queue WHERE status = 'pending'");
+      const pendingCount = pendingRows[0];
       if (pendingCount && pendingCount.cnt === 0) {
         logger.info('Queue empty — triggering automatic scan');
         try {
@@ -257,7 +262,7 @@ function initScheduler() {
 
   // Strike monitoring every 15 minutes
   cron.schedule('*/15 * * * *', async () => {
-    const accounts = dbHelpers.getAllActiveAccounts();
+    const accounts = await dbHelpers.getAllActiveAccounts();
     for (const acc of accounts) {
       if (acc.status === 'strike') {
         logger.warn(`⚠️ STRIKE DETECTED on ${acc.handle} — suspended`);
