@@ -74,9 +74,11 @@ async function buildDailyQueue(scanResults) {
     const catVideos = scanResults[account.category];
     if (!catVideos) continue;
 
+    const recentVideos = Array.isArray(catVideos.recent) ? catVideos.recent : [];
+    const evergreenVideos = Array.isArray(catVideos.evergreen) ? catVideos.evergreen : [];
     const allVideos = [
-      ...catVideos.recent.map(v => ({ ...v, mixType: 'recent' })),
-      ...catVideos.evergreen.map(v => ({ ...v, mixType: 'evergreen' })),
+      ...recentVideos.map(v => ({ ...v, mixType: 'recent' })),
+      ...evergreenVideos.map(v => ({ ...v, mixType: 'evergreen' })),
     ];
 
     // Filter out already published
@@ -100,8 +102,25 @@ async function buildDailyQueue(scanResults) {
     for (let i = 0; i < selected.length; i++) {
       const video = selected[i];
 
-      // Generate AI content
-      const aiContent = await generateContent(video, account.category);
+      // Generate AI content with fallback
+      let aiContent;
+      try {
+        aiContent = await generateContent(video, account.category);
+      } catch(aiErr) {
+        logger.warn('AI generation failed for ' + video.id + ' — using original title');
+        aiContent = {
+          titre: video.title || 'Video viral',
+          description: video.title || 'Video viral',
+          hashtags: ['viral', 'shorts', account.category]
+        };
+      }
+      if (!aiContent || !aiContent.titre) {
+        aiContent = {
+          titre: video.title || 'Video viral',
+          description: video.title || 'Video viral',
+          hashtags: ['viral', 'shorts', account.category]
+        };
+      }
       const randomSeconds = Math.floor(Math.random() * 120); // 0-120s random offset
       const scheduledAt = new Date(scheduleTime.getTime() + randomSeconds * 1000);
 
@@ -134,7 +153,7 @@ async function processQueue() {
 
   const accounts = dbHelpers.getAllActiveAccounts();
 
-  for (const account of accounts) {
+  for (let account of accounts) {
     const queue = dbHelpers.getPendingQueue(account.handle);
     const dueItems = queue.filter(item => new Date(item.scheduled_at) <= now);
 
@@ -150,10 +169,16 @@ async function processQueue() {
           break;
         }
 
-        // Step 1: Download YouTube video and upload to R2
+        // Step 1: Download YouTube video and upload to R2 (with 3min timeout)
         logger.info('Downloading video ' + item.video_id + ' for ' + account.handle);
-        const r2Url = await downloadAndUploadToR2(item.video_id, item.category);
-        
+        let r2Url = null;
+        try {
+          const downloadPromise = downloadAndUploadToR2(item.video_id, item.category);
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Download timeout')), 180000));
+          r2Url = await Promise.race([downloadPromise, timeoutPromise]);
+        } catch(downloadErr) {
+          logger.error('Download error for ' + item.video_id + ': ' + downloadErr.message);
+        }
         if (!r2Url) {
           logger.error('Could not get R2 URL for ' + item.video_id + ' — skipping');
           dbHelpers.markQueueDone(item.id, 'failed');

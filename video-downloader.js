@@ -43,6 +43,26 @@ async function getYouTubeDirectUrl(videoId) {
 }
 
 // Download video and upload to R2, return public URL
+// Fallback: try alternative cobalt endpoint
+async function getYouTubeUrlFallback(videoId) {
+  try {
+    // Try cobalt with different parameters
+    const res = await axios.post('https://api.cobalt.tools/api/json', {
+      url: 'https://youtu.be/' + videoId,
+      vQuality: '480',
+      filenamePattern: 'basic',
+    }, {
+      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+      timeout: 20000,
+    });
+    if (res.data && res.data.url) return res.data.url;
+    return null;
+  } catch(e) {
+    logger.error('Fallback URL error for ' + videoId + ': ' + e.message);
+    return null;
+  }
+}
+
 async function downloadAndUploadToR2(videoId, category) {
   try {
     const r2Key = 'videos/' + category + '/' + videoId + '.mp4';
@@ -50,7 +70,11 @@ async function downloadAndUploadToR2(videoId, category) {
     // Get direct YouTube URL
     const directUrl = await getYouTubeDirectUrl(videoId);
     if (!directUrl) {
-      logger.error('Could not get direct URL for ' + videoId);
+      logger.info('Trying fallback for ' + videoId);
+      directUrl = await getYouTubeUrlFallback(videoId);
+    }
+    if (!directUrl) {
+      logger.error('Could not get direct URL for ' + videoId + ' — all methods failed');
       return null;
     }
 
