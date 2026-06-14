@@ -324,11 +324,25 @@ async function start() {
       logger.info('Dashboard: https://viralbot-backend-production.up.railway.app');
       logger.info('TikTok verification: https://viralbot-backend-production.up.railway.app/tiktok-site-verification');
       initScheduler();
+      // Only scan if not already done today — avoids wasting YouTube quota on restarts
       setTimeout(async () => {
         try {
+          const lastScan = dbHelpers.getStat('last_scan');
+          const today = new Date().toDateString();
+          const lastScanDate = lastScan ? new Date(lastScan).toDateString() : null;
+          if (lastScanDate === today) {
+            logger.info('Initial scan skipped — already ran today');
+            return;
+          }
+          logger.info('Running initial scan...');
           const results = await scanAllCategories();
           const { buildDailyQueue } = require('./scheduler');
           await buildDailyQueue(results);
+          dbHelpers.run(
+            "INSERT OR REPLACE INTO system_stats (key, value) VALUES ('last_scan', ?)",
+            [new Date().toISOString()]
+          );
+          logger.info('Initial scan complete');
         } catch (err) {
           logger.error('Initial scan error: ' + err.message);
         }
