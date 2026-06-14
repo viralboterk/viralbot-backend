@@ -2,6 +2,9 @@ const { Pool } = require('pg');
 const logger = require('./logger');
 
 // PostgreSQL connection pool
+if (!process.env.DATABASE_URL) {
+  throw new Error('DATABASE_URL environment variable is not set. Please add a PostgreSQL database in Railway.');
+}
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: process.env.DATABASE_URL && process.env.DATABASE_URL.includes('railway')

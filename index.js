@@ -349,7 +349,8 @@ async function start() {
       }, 5000);
     });
   } catch (err) {
-    logger.error('Startup error: ' + err.message);
+    logger.error('Startup error: ' + (err.message || JSON.stringify(err) || String(err)));
+    logger.error('Full error: ' + JSON.stringify(err, Object.getOwnPropertyNames(err)));
     process.exit(1);
   }
 }
