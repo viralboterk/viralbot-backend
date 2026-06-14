@@ -13,6 +13,32 @@ function randomDelay() {
 
 
 // Refresh TikTok token if needed before publishing
+
+// Track quota exhaustion
+let quotaExhausted = false;
+let quotaResetTime = null;
+
+function markQuotaExhausted() {
+  quotaExhausted = true;
+  // Reset at midnight UTC
+  const now = new Date();
+  const midnight = new Date(now);
+  midnight.setUTCHours(24, 0, 0, 0);
+  quotaResetTime = midnight;
+  logger.warn('YouTube quota exhausted — scans paused until ' + midnight.toISOString());
+}
+
+function isQuotaAvailable() {
+  if (!quotaExhausted) return true;
+  if (quotaResetTime && new Date() > quotaResetTime) {
+    quotaExhausted = false;
+    quotaResetTime = null;
+    logger.info('YouTube quota reset — scans resuming');
+    return true;
+  }
+  return false;
+}
+
 async function ensureValidToken(account) {
   if (!account.refresh_token) return account;
   try {
@@ -39,7 +65,7 @@ async function buildDailyQueue(scanResults) {
   logger.info('Building daily queue for all accounts');
   const accounts = dbHelpers.getAllActiveAccounts();
 
-  for (const account of accounts) {
+  for (let account of accounts) {
     if (!account.category) {
       logger.warn(`Account ${account.handle} has no category assigned — skipping`);
       continue;
@@ -171,6 +197,9 @@ function initScheduler() {
     logger.info('=== DAILY SCAN STARTED ===');
     try {
       const results = await scanAllCategories();
+          // Check if quota was exhausted during scan
+          const allEmpty = Object.values(results).every(r => (!r.recent || r.recent.length === 0) && (!r.evergreen || r.evergreen.length === 0));
+          if (allEmpty) markQuotaExhausted();
       await buildDailyQueue(results);
       logger.info('=== DAILY SCAN COMPLETE ===');
     } catch (err) {
@@ -180,16 +209,20 @@ function initScheduler() {
 
   // Process queue every 5 minutes (06:00–22:00)
   cron.schedule('*/5 6-21 * * *', async () => {
-    // If queue is empty, trigger a scan
-    const pendingCount = dbHelpers.all("SELECT COUNT(*) as cnt FROM video_queue WHERE status = 'pending'")[0];
-    if (pendingCount && pendingCount.cnt === 0) {
-      logger.info('Queue empty — triggering automatic scan');
-      try {
-        const results = await scanAllCategories();
-        await buildDailyQueue(results);
-      } catch(e) {
-        logger.error('Auto-scan error: ' + e.message);
+    // If queue is empty, trigger a scan (only if quota available)
+    if (isQuotaAvailable()) {
+      const pendingCount = dbHelpers.all("SELECT COUNT(*) as cnt FROM video_queue WHERE status = 'pending'")[0];
+      if (pendingCount && pendingCount.cnt === 0) {
+        logger.info('Queue empty — triggering automatic scan');
+        try {
+          const results = await scanAllCategories();
+          await buildDailyQueue(results);
+        } catch(e) {
+          logger.error('Auto-scan error: ' + e.message);
+        }
       }
+    } else {
+      logger.info('Queue empty but YouTube quota exhausted — waiting for reset at midnight UTC');
     }
     await processQueue();
   });
