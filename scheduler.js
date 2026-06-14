@@ -14,29 +14,32 @@ function randomDelay() {
 
 // Refresh TikTok token if needed before publishing
 
-// Track quota exhaustion
-let quotaExhausted = false;
-let quotaResetTime = null;
-
+// Track quota exhaustion — persisted in DB to survive restarts
 function markQuotaExhausted() {
-  quotaExhausted = true;
-  // Reset at midnight UTC
-  const now = new Date();
-  const midnight = new Date(now);
+  const midnight = new Date();
   midnight.setUTCHours(24, 0, 0, 0);
-  quotaResetTime = midnight;
+  dbHelpers.run(
+    "INSERT OR REPLACE INTO system_stats (key, value) VALUES ('quota_exhausted_until', ?)",
+    [midnight.toISOString()]
+  );
   logger.warn('YouTube quota exhausted — scans paused until ' + midnight.toISOString());
 }
 
 function isQuotaAvailable() {
-  if (!quotaExhausted) return true;
-  if (quotaResetTime && new Date() > quotaResetTime) {
-    quotaExhausted = false;
-    quotaResetTime = null;
-    logger.info('YouTube quota reset — scans resuming');
-    return true;
+  try {
+    const val = dbHelpers.getStat('quota_exhausted_until');
+    if (!val) return true;
+    const resetTime = new Date(val);
+    if (new Date() > resetTime) {
+      // Quota reset — clear the flag
+      dbHelpers.run("DELETE FROM system_stats WHERE key = 'quota_exhausted_until'");
+      logger.info('YouTube quota reset — scans resuming');
+      return true;
+    }
+    return false;
+  } catch(e) {
+    return true; // If DB error, allow scan
   }
-  return false;
 }
 
 async function ensureValidToken(account) {
