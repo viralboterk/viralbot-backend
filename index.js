@@ -310,6 +310,32 @@ app.get('/api/system', async (req, res) => {
   });
 });
 
+
+// IA generation route for dashboard manual use
+app.post('/api/generate', async (req, res) => {
+  try {
+    const { videoId, title, category, language, tone } = req.body;
+    if (!videoId || !category) {
+      return res.status(400).json({ error: 'videoId and category required' });
+    }
+    const { generateContent } = require('./ai-editor');
+    const video = { id: videoId, title: title || '', lang: language || 'EN' };
+    const content = await generateContent(video, category, tone);
+    if (!content) {
+      return res.status(500).json({ error: 'AI generation failed' });
+    }
+    res.json({
+      success: true,
+      titre: content.titre,
+      description: content.description,
+      hashtags: content.hashtags,
+    });
+  } catch (err) {
+    logger.error('Generate route error: ' + err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // =====================
 // START SERVER
 // =====================

@@ -552,7 +552,7 @@ let ttVids = [];
 
 // ===== CLOCK =====
 setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});},1000);
-setInterval(()=>{scanned+=Math.floor(Math.random()*30+10);addLog('info','Scanning YouTube Shorts — '+CATS[Math.floor(Math.random()*CATS.length)].label);},8000);
+// Fake scan animation removed — only real Railway logs shown
 
 // ===== NAV =====
 const TITLES={dashboard:'Dashboard',pipeline:'Pipeline live',categories:'5 Catégories',top48:'Top 48 par catégorie',filtre:'Filtres copyright',edition:'Édition IA',comptes:'10 Comptes TikTok',planning:'Planning',strikes:'Strikes',config:'Config API'};

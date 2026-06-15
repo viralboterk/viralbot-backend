@@ -17,12 +17,14 @@ const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || process.env.R2_ENDPOINT + '/'
 
 // Get YouTube video direct download URL using cobalt.tools
 async function getYouTubeDirectUrl(videoId) {
+  // Try cobalt.tools v2 API (new format)
   try {
-    const res = await axios.post('https://api.cobalt.tools/api/json', {
+    const res = await axios.post('https://api.cobalt.tools/', {
       url: 'https://www.youtube.com/watch?v=' + videoId,
-      vQuality: '720',
-      filenamePattern: 'basic',
-      isAudioOnly: false,
+      videoQuality: '720',
+      filenameStyle: 'basic',
+      audioFormat: 'mp3',
+      downloadMode: 'auto',
     }, {
       headers: {
         'Accept': 'application/json',
@@ -32,7 +34,7 @@ async function getYouTubeDirectUrl(videoId) {
     });
 
     if (res.data && res.data.url) {
-      logger.info('Got direct URL for ' + videoId + ' via cobalt.tools');
+      logger.info('Got direct URL for ' + videoId + ' via cobalt.tools v2');
       return res.data.url;
     }
     return null;
@@ -45,17 +47,23 @@ async function getYouTubeDirectUrl(videoId) {
 // Download video and upload to R2, return public URL
 // Fallback: try alternative cobalt endpoint
 async function getYouTubeUrlFallback(videoId) {
+  // Fallback: try yt-dlp3 API
   try {
-    // Try cobalt with different parameters
-    const res = await axios.post('https://api.cobalt.tools/api/json', {
-      url: 'https://youtu.be/' + videoId,
-      vQuality: '480',
-      filenamePattern: 'basic',
-    }, {
-      headers: { 'Accept': 'application/json', 'Content-Type': 'application/json' },
+    const res = await axios.get('https://yt-dlp3.p.rapidapi.com/download', {
+      params: {
+        url: 'https://www.youtube.com/watch?v=' + videoId,
+        format: 'best[height<=720][ext=mp4]/best[ext=mp4]/best',
+      },
+      headers: {
+        'X-RapidAPI-Key': process.env.RAPIDAPI_KEY || '',
+        'X-RapidAPI-Host': 'yt-dlp3.p.rapidapi.com',
+      },
       timeout: 20000,
     });
-    if (res.data && res.data.url) return res.data.url;
+    if (res.data && res.data.url) {
+      logger.info('Got URL for ' + videoId + ' via yt-dlp3 fallback');
+      return res.data.url;
+    }
     return null;
   } catch(e) {
     logger.error('Fallback URL error for ' + videoId + ': ' + e.message);
@@ -68,7 +76,7 @@ async function downloadAndUploadToR2(videoId, category) {
     const r2Key = 'videos/' + category + '/' + videoId + '.mp4';
 
     // Get direct YouTube URL
-    const directUrl = await getYouTubeDirectUrl(videoId);
+    let directUrl = await getYouTubeDirectUrl(videoId);
     if (!directUrl) {
       logger.info('Trying fallback for ' + videoId);
       directUrl = await getYouTubeUrlFallback(videoId);
