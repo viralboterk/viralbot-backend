@@ -339,8 +339,8 @@ async function start() {
           const { buildDailyQueue } = require('./scheduler');
           await buildDailyQueue(results);
           await dbHelpers.run(
-            "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()'last_scan', ?)",
-            [new Date().toISOString()]
+            "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
+            ['last_scan', new Date().toISOString()]
           );
           logger.info('Initial scan complete');
         } catch (err) {
