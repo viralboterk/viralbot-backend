@@ -42,11 +42,22 @@ IMPORTANT: Réponds UNIQUEMENT avec le JSON brut, SANS backticks, SANS markdown,
 
     let text = response.content.map(c => c.text || '').join('').trim();
     // Strip markdown backticks if Claude adds them despite instructions
-    text = text.replace(/^```jsons*/i, '').replace(/^```s*/i, '').replace(/```s*$/i, '').trim();
+    text = text.replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```\s*$/i, '').trim();
     // Extract JSON object if there's surrounding text
-    const jsonMatch = text.match(/{[sS]*}/);
-    if (!jsonMatch) throw new Error('No JSON object found in response');
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      logger.warn('AI no JSON for ' + video.id + ': ' + text.substring(0, 80));
+      return {
+        titre: (video.title || 'Video viral').substring(0, 80),
+        description: video.title || 'Contenu viral incroyable !',
+        hashtags: ['viral', 'fyp', 'foryou', 'trending', 'shorts', category],
+        hook: 'Tu vas pas croire ca...',
+        langue: video.lang || 'FR',
+      };
+    }
     const json = JSON.parse(jsonMatch[0]);
+    if (!json.titre) json.titre = (video.title || 'Video viral').substring(0, 80);
+    if (!json.hashtags) json.hashtags = ['viral', 'fyp', 'foryou', 'trending', 'shorts', category];
     return json;
   } catch (err) {
     logger.error(`AI Editor error for ${video.id}: ${err.message}`);

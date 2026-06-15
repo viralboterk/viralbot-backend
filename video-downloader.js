@@ -14,7 +14,7 @@ const s3 = new S3Client({
 
 const BUCKET = process.env.R2_BUCKET_NAME || 'viral-videos';
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || process.env.R2_ENDPOINT + '/' + BUCKET;
-const COBALT_URL = process.env.COBALT_URL || 'https://cobalt-api-production-6ad6.up.railway.app';
+const COBALT_URL = (process.env.COBALT_URL || 'https://cobalt-api-production-6ad6.up.railway.app').trim().replace(/\/+$/, '');
 
 // METHOD 1: Private Cobalt instance (self-hosted on Railway)
 async function tryCobaltPrivate(videoId) {
@@ -30,19 +30,25 @@ async function tryCobaltPrivate(videoId) {
         'Content-Type': 'application/json',
       },
       timeout: 30000,
+      maxRedirects: 0,
     });
 
     if (res.data && res.data.url) {
+      try { new URL(res.data.url); } catch(e) { logger.error('Invalid URL from Cobalt: ' + res.data.url); return null; }
       logger.info('Private Cobalt success for ' + videoId);
       return res.data.url;
     }
     if (res.data && res.data.tunnel) {
+      try { new URL(res.data.tunnel); } catch(e) { logger.error('Invalid tunnel URL: ' + res.data.tunnel); return null; }
       logger.info('Private Cobalt tunnel success for ' + videoId);
       return res.data.tunnel;
     }
+    logger.error('Cobalt no URL for ' + videoId + ': ' + JSON.stringify(res.data).substring(0, 200));
     return null;
   } catch(e) {
-    logger.error('Private Cobalt error for ' + videoId + ': ' + e.message);
+    const status = e.response ? e.response.status : 'no-status';
+    const data = e.response ? JSON.stringify(e.response.data).substring(0, 150) : e.message;
+    logger.error('Private Cobalt error for ' + videoId + ' [' + status + ']: ' + data);
     return null;
   }
 }
@@ -61,6 +67,7 @@ async function tryCobaltFallback(videoId) {
         'Content-Type': 'application/json',
       },
       timeout: 30000,
+      maxRedirects: 0,
     });
 
     if (res.data && res.data.url) {
@@ -70,9 +77,12 @@ async function tryCobaltFallback(videoId) {
     if (res.data && res.data.tunnel) {
       return res.data.tunnel;
     }
+    logger.error('Cobalt fallback no URL for ' + videoId + ': ' + JSON.stringify(res.data).substring(0, 150));
     return null;
   } catch(e) {
-    logger.error('Private Cobalt fallback error for ' + videoId + ': ' + e.message);
+    const status = e.response ? e.response.status : 'no-status';
+    const data = e.response ? JSON.stringify(e.response.data).substring(0, 150) : e.message;
+    logger.error('Private Cobalt fallback error for ' + videoId + ' [' + status + ']: ' + data);
     return null;
   }
 }
@@ -91,6 +101,7 @@ async function tryCobaltShort(videoId) {
         'Content-Type': 'application/json',
       },
       timeout: 30000,
+      maxRedirects: 0,
     });
 
     if (res.data && res.data.url) {
@@ -100,9 +111,12 @@ async function tryCobaltShort(videoId) {
     if (res.data && res.data.tunnel) {
       return res.data.tunnel;
     }
+    logger.error('Cobalt short URL no URL for ' + videoId + ': ' + JSON.stringify(res.data).substring(0, 150));
     return null;
   } catch(e) {
-    logger.error('Private Cobalt short URL error for ' + videoId + ': ' + e.message);
+    const status = e.response ? e.response.status : 'no-status';
+    const data = e.response ? JSON.stringify(e.response.data).substring(0, 150) : e.message;
+    logger.error('Private Cobalt short URL error for ' + videoId + ' [' + status + ']: ' + data);
     return null;
   }
 }
