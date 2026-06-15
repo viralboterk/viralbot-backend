@@ -14,11 +14,12 @@ const s3 = new S3Client({
 
 const BUCKET = process.env.R2_BUCKET_NAME || 'viral-videos';
 const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || process.env.R2_ENDPOINT + '/' + BUCKET;
+const COBALT_URL = process.env.COBALT_URL || 'https://cobalt-api-production-6ad6.up.railway.app';
 
-// METHOD 1: cobalt.tools — correct Accept header required
-async function tryCobalTools(videoId) {
+// METHOD 1: Private Cobalt instance (self-hosted on Railway)
+async function tryCobaltPrivate(videoId) {
   try {
-    const res = await axios.post('https://api.cobalt.tools/', {
+    const res = await axios.post(COBALT_URL + '/', {
       url: 'https://www.youtube.com/watch?v=' + videoId,
       videoQuality: '720',
       filenameStyle: 'basic',
@@ -27,124 +28,110 @@ async function tryCobalTools(videoId) {
       headers: {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (compatible; ViralBot/1.0)',
       },
-      timeout: 15000,
+      timeout: 30000,
     });
+
     if (res.data && res.data.url) {
-      logger.info('cobalt.tools success for ' + videoId);
+      logger.info('Private Cobalt success for ' + videoId);
       return res.data.url;
     }
     if (res.data && res.data.tunnel) {
-      logger.info('cobalt.tools tunnel success for ' + videoId);
+      logger.info('Private Cobalt tunnel success for ' + videoId);
       return res.data.tunnel;
     }
     return null;
   } catch(e) {
-    logger.error('cobalt.tools error for ' + videoId + ': ' + e.message);
+    logger.error('Private Cobalt error for ' + videoId + ': ' + e.message);
     return null;
   }
 }
 
-// METHOD 2: yt-dlp via public instance
-async function tryYtDlpPublic(videoId) {
+// METHOD 2: Cobalt with different quality fallback
+async function tryCobaltFallback(videoId) {
   try {
-    // Using invidious API to get direct stream URL
-    const instances = [
-      'https://invidious.nerdvpn.de',
-      'https://invidious.privacydev.net',
-      'https://yt.artemislena.eu',
-    ];
-    for (const instance of instances) {
-      try {
-        const res = await axios.get(instance + '/api/v1/videos/' + videoId, {
-          timeout: 10000,
-          headers: { 'User-Agent': 'Mozilla/5.0' }
-        });
-        if (res.data && res.data.adaptiveFormats) {
-          // Get best mp4 format
-          const formats = res.data.adaptiveFormats
-            .filter(f => f.type && f.type.includes('video/mp4') && f.qualityLabel)
-            .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
-          if (formats.length > 0 && formats[0].url) {
-            logger.info('Invidious success for ' + videoId + ' via ' + instance);
-            return formats[0].url;
-          }
-        }
-        // Try formatStreams for combined video+audio
-        if (res.data && res.data.formatStreams) {
-          const mp4 = res.data.formatStreams
-            .filter(f => f.type && f.type.includes('video/mp4'))
-            .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0));
-          if (mp4.length > 0 && mp4[0].url) {
-            logger.info('Invidious formatStreams success for ' + videoId);
-            return mp4[0].url;
-          }
-        }
-      } catch(instanceErr) {
-        logger.error('Invidious instance ' + instance + ' failed: ' + instanceErr.message);
-      }
-    }
-    return null;
-  } catch(e) {
-    logger.error('yt-dlp public error for ' + videoId + ': ' + e.message);
-    return null;
-  }
-}
-
-// METHOD 3: RapidAPI YouTube downloader (if key provided)
-async function tryRapidApi(videoId) {
-  if (!process.env.RAPIDAPI_KEY) return null;
-  try {
-    const res = await axios.get('https://youtube-mp36.p.rapidapi.com/dl', {
-      params: { id: videoId },
+    const res = await axios.post(COBALT_URL + '/', {
+      url: 'https://www.youtube.com/watch?v=' + videoId,
+      videoQuality: '480',
+      filenameStyle: 'basic',
+      downloadMode: 'auto',
+    }, {
       headers: {
-        'X-RapidAPI-Key': process.env.RAPIDAPI_KEY,
-        'X-RapidAPI-Host': 'youtube-mp36.p.rapidapi.com',
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
       },
-      timeout: 15000,
+      timeout: 30000,
     });
-    if (res.data && res.data.link) {
-      logger.info('RapidAPI success for ' + videoId);
-      return res.data.link;
+
+    if (res.data && res.data.url) {
+      logger.info('Private Cobalt fallback success for ' + videoId);
+      return res.data.url;
+    }
+    if (res.data && res.data.tunnel) {
+      return res.data.tunnel;
     }
     return null;
   } catch(e) {
-    logger.error('RapidAPI error for ' + videoId + ': ' + e.message);
+    logger.error('Private Cobalt fallback error for ' + videoId + ': ' + e.message);
     return null;
   }
 }
 
-// Main download function — tries all methods in order
+// METHOD 3: Cobalt with youtu.be format
+async function tryCobaltShort(videoId) {
+  try {
+    const res = await axios.post(COBALT_URL + '/', {
+      url: 'https://youtu.be/' + videoId,
+      videoQuality: '720',
+      filenameStyle: 'basic',
+      downloadMode: 'auto',
+    }, {
+      headers: {
+        'Accept': 'application/json',
+        'Content-Type': 'application/json',
+      },
+      timeout: 30000,
+    });
+
+    if (res.data && res.data.url) {
+      logger.info('Private Cobalt short URL success for ' + videoId);
+      return res.data.url;
+    }
+    if (res.data && res.data.tunnel) {
+      return res.data.tunnel;
+    }
+    return null;
+  } catch(e) {
+    logger.error('Private Cobalt short URL error for ' + videoId + ': ' + e.message);
+    return null;
+  }
+}
+
+// Main: try all methods in order
 async function getYouTubeDirectUrl(videoId) {
   let url = null;
 
-  // Try cobalt.tools first
-  url = await tryCobalTools(videoId);
+  url = await tryCobaltPrivate(videoId);
   if (url) return url;
 
-  // Try Invidious instances
-  url = await tryYtDlpPublic(videoId);
+  url = await tryCobaltFallback(videoId);
   if (url) return url;
 
-  // Try RapidAPI if key available
-  url = await tryRapidApi(videoId);
+  url = await tryCobaltShort(videoId);
   if (url) return url;
 
   logger.error('All download methods failed for ' + videoId);
   return null;
 }
 
-// Keep for compatibility
 async function getYouTubeUrlFallback(videoId) {
-  return tryYtDlpPublic(videoId);
+  return tryCobaltFallback(videoId);
 }
 
 async function downloadAndUploadToR2(videoId, category) {
   try {
     const r2Key = 'videos/' + category + '/' + videoId + '.mp4';
 
-    // Get direct YouTube URL
     let directUrl = await getYouTubeDirectUrl(videoId);
     if (!directUrl) {
       logger.error('Could not get direct URL for ' + videoId + ' — all methods failed');
@@ -153,7 +140,6 @@ async function downloadAndUploadToR2(videoId, category) {
 
     logger.info('Downloading video ' + videoId + '...');
 
-    // Download video
     const response = await axios.get(directUrl, {
       responseType: 'arraybuffer',
       timeout: 120000,
@@ -166,12 +152,11 @@ async function downloadAndUploadToR2(videoId, category) {
 
     const videoBuffer = Buffer.from(response.data);
     if (videoBuffer.length < 10000) {
-      logger.error('Downloaded file too small for ' + videoId + ': ' + videoBuffer.length + ' bytes — likely invalid');
+      logger.error('Downloaded file too small for ' + videoId + ': ' + videoBuffer.length + ' bytes');
       return null;
     }
     logger.info('Downloaded ' + videoId + ': ' + (videoBuffer.length / 1024 / 1024).toFixed(1) + 'MB');
 
-    // Upload to R2
     await s3.send(new PutObjectCommand({
       Bucket: BUCKET,
       Key: r2Key,
@@ -188,7 +173,6 @@ async function downloadAndUploadToR2(videoId, category) {
   }
 }
 
-// Delete from R2 after successful publish
 async function deleteFromR2(key) {
   try {
     const { DeleteObjectCommand } = require('@aws-sdk/client-s3');

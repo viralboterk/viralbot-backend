@@ -834,7 +834,7 @@ async function genAI(){
   fetch('/api/generate',{
     method:'POST',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({videoId:v.id,title:v.title,category:v.cat,language:lang,tone:tone})
+    body:JSON.stringify({videoId:v.videoId,title:v.title,category:v.cat,language:lang,tone:tone})
   })
   .then(function(r){return r.json();})
   .then(function(d){
