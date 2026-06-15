@@ -25,7 +25,7 @@ Vues YouTube : ${video.views?.toLocaleString() || 'N/A'}
 Durée : ${video.duration}s
 Langue cible : ${lang === 'FR' ? 'Français' : 'Anglais'}
 
-Réponds UNIQUEMENT en JSON valide, sans markdown ni backticks :
+IMPORTANT: Réponds UNIQUEMENT avec le JSON brut, SANS backticks, SANS markdown, SANS texte avant ou après. Commence directement par { et termine par } :
 {
   "titre": "titre TikTok catchy max 80 chars",
   "description": "2-3 phrases : qui, où, quoi — ton accrocheur adapté à ${catContext}",
@@ -40,8 +40,13 @@ Réponds UNIQUEMENT en JSON valide, sans markdown ni backticks :
       messages: [{ role: 'user', content: prompt }],
     });
 
-    const text = response.content.map(c => c.text || '').join('').trim();
-    const json = JSON.parse(text);
+    let text = response.content.map(c => c.text || '').join('').trim();
+    // Strip markdown backticks if Claude adds them despite instructions
+    text = text.replace(/^```jsons*/i, '').replace(/^```s*/i, '').replace(/```s*$/i, '').trim();
+    // Extract JSON object if there's surrounding text
+    const jsonMatch = text.match(/{[sS]*}/);
+    if (!jsonMatch) throw new Error('No JSON object found in response');
+    const json = JSON.parse(jsonMatch[0]);
     return json;
   } catch (err) {
     logger.error(`AI Editor error for ${video.id}: ${err.message}`);

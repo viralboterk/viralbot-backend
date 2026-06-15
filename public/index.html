@@ -825,32 +825,39 @@ async function genAI(){
   const rank=document.getElementById('vid-sel').value;
   if(!rank){notify('Sélectionne une vidéo !','warn');return;}
   const v=VIDEOS.find(x=>x.rank==rank);
-  const cat=getCat(v.cat);
+  if(!v){notify('Vidéo introuvable','warn');return;}
   const lang=document.getElementById('lang-sel').value;
   const tone=document.getElementById('tone-sel').value;
-  const lf=lang==='auto'?(v.lang||'FR'):lang.toUpperCase();
-  const tl={hype:'hype et choquant',question:'question intrigante',pov:'POV immersif',factual:'factuel accrocheur'}[tone];
   document.getElementById('ai-load').style.display='flex';
   document.getElementById('ai-result').innerHTML='';
   document.getElementById('ai-lang').innerHTML='';
-  try{
-    const res=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,messages:[{role:'user',content:`Tu es un expert en contenu viral TikTok spécialisé dans la catégorie "${cat?.label}". Génère du contenu pour ce YouTube Short :\nTitre : "${v.title}"\nCatégorie : ${cat?.label} ${cat?.icon}\nType : ${v.mix==='recent'?'Vidéo récente (dernières 24h)':'Vidéo evergreen (top 6 ans)'}\nVues : ${v.views} | Durée : ${v.dur}\nLangue : ${lf==='FR'?'Français':'Anglais'} | Ton : ${tl}\nRéponds UNIQUEMENT en JSON valide :\n{"titre":"(max 80 chars, catchy et adapté à la catégorie ${cat?.label})","description":"2-3 phrases : qui, où, quoi — ${tl}","hashtags":["tag1",...20 tags sans # adaptés à ${cat?.label}],"langue":"${lf}","emotion":"émotion dominante","hook":"accroche 2 premières secondes max 15 mots"}`}]})});
-    const data=await res.json();
-    const json=JSON.parse(data.content.map(c=>c.text||'').join('').replace(/```json|```/g,'').trim());
-    document.getElementById('ai-lang').innerHTML=`<span class="badge b-purple">${json.langue} · ${json.emotion}</span>`;
-    document.getElementById('ai-result').innerHTML=`<div class="ai-out">
-      <div class="ai-field"><div class="ai-lbl">⚡ Hook (2 premières secondes)</div><div style="font-size:15px;font-weight:800;color:var(--purple);font-family:'DM Serif Display',serif;line-height:1.3">${json.hook}</div></div>
-      <div class="ai-field"><div class="ai-lbl">📝 Titre</div><div style="font-size:15px;font-weight:700;line-height:1.4">${json.titre}</div></div>
-      <div class="ai-field"><div class="ai-lbl">📋 Description</div><div style="font-size:13px;color:var(--text2);line-height:1.6">${json.description}</div></div>
-      <div class="ai-field"><div class="ai-lbl">🏷️ Hashtags (${json.hashtags.length})</div><div class="tag-cloud">${json.hashtags.map(t=>`<span class="tag">#${t}</span>`).join('')}</div></div>
-      <div style="display:flex;gap:8px;margin-top:14px"><button class="btn btn-primary btn-sm" onclick="notify('Contenu appliqué !','success')">✓ Appliquer</button><button class="btn btn-sm" onclick="genAI()">↺ Regénérer</button></div>
-    </div>`;
-    notify('Contenu généré ✨','success');
-  }catch(e){document.getElementById('ai-result').innerHTML=`<div style="color:var(--red);text-align:center;padding:32px">⚠️ Erreur de génération.</div>`;notify('Erreur IA','err');}
-  document.getElementById('ai-load').style.display='none';
+  fetch('/api/generate',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({videoId:v.id,title:v.title,category:v.cat,language:lang,tone:tone})
+  })
+  .then(function(r){return r.json();})
+  .then(function(d){
+    document.getElementById('ai-load').style.display='none';
+    if(d.error){
+      document.getElementById('ai-result').innerHTML='<div style="color:var(--red);padding:16px">⚠️ Erreur de génération.</div>';
+      return;
+    }
+    const hashtags=(d.hashtags||[]).map(function(t){return '#'+t;}).join(' ');
+    document.getElementById('ai-result').innerHTML=
+      '<div style="margin-bottom:12px"><strong>Titre</strong><div style="background:var(--bg2);border-radius:8px;padding:10px;margin-top:4px;font-size:14px">'+d.titre+'</div></div>'+
+      '<div style="margin-bottom:12px"><strong>Description</strong><div style="background:var(--bg2);border-radius:8px;padding:10px;margin-top:4px;font-size:13px">'+d.description+'</div></div>'+
+      '<div><strong>Hashtags</strong><div style="background:var(--bg2);border-radius:8px;padding:10px;margin-top:4px;font-size:12px;color:var(--purple2)">'+hashtags+'</div></div>';
+    document.getElementById('ai-lang').innerHTML='<span style="font-size:11px;color:var(--muted)">Langue: '+(d.langue||'FR')+'</span>';
+    notify('Contenu généré !','success');
+  })
+  .catch(function(err){
+    document.getElementById('ai-load').style.display='none';
+    document.getElementById('ai-result').innerHTML='<div style="color:var(--red);padding:16px">⚠️ Erreur de génération.</div>';
+    notify('Erreur génération IA','error');
+  });
 }
 
-// ===== COMPTES =====
 function renderAccounts(){
   document.getElementById('accounts-grid').innerHTML=ACCOUNTS.map(a=>{
     const cat=getCat(a.cat);
