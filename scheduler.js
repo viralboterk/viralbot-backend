@@ -49,7 +49,7 @@ async function ensureValidToken(account) {
     const newTokenData = await refreshToken(account.refresh_token);
     if (newTokenData && newTokenData.access_token) {
       await dbHelpers.run(
-        "UPDATE accounts SET access_token = ?, refresh_token = ?, status = 'active' WHERE handle = ?",
+        "UPDATE accounts SET access_token = $1, refresh_token = $2, status = 'active' WHERE handle = $3",
         [newTokenData.access_token, newTokenData.refresh_token || account.refresh_token, account.handle]
       );
       account.access_token = newTokenData.access_token;
@@ -231,8 +231,20 @@ function initScheduler() {
       const results = await scanAllCategories();
           // Check if quota was exhausted during scan
           const allEmpty = Object.values(results).every(r => (!r.recent || r.recent.length === 0) && (!r.evergreen || r.evergreen.length === 0));
-          if (allEmpty) markQuotaExhausted();
-      await buildDailyQueue(results);
+          if (allEmpty) {
+            await markQuotaExhausted();
+          } else {
+            // Save last scan time
+            await dbHelpers.run(
+              "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
+              ['last_scan', new Date().toISOString()]
+            );
+            await dbHelpers.run(
+              "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
+              ['last_auto_scan', new Date().toISOString()]
+            );
+            await buildDailyQueue(results);
+          }
       logger.info('=== DAILY SCAN COMPLETE ===');
     } catch (err) {
       logger.error(`Daily scan error: ${err.message}`);
@@ -245,13 +257,24 @@ function initScheduler() {
     if (await isQuotaAvailable()) {
       const pendingRows = await dbHelpers.all("SELECT COUNT(*) as cnt FROM video_queue WHERE status = 'pending'");
       const pendingCount = pendingRows[0];
-      if (pendingCount && pendingCount.cnt === 0) {
-        logger.info('Queue empty — triggering automatic scan');
-        try {
-          const results = await scanAllCategories();
-          await buildDailyQueue(results);
-        } catch(e) {
-          logger.error('Auto-scan error: ' + e.message);
+      if (pendingCount && parseInt(pendingCount.cnt) === 0) {
+        // Check if we scanned in the last 30 minutes to avoid infinite loop
+        const lastScan = await dbHelpers.getStat('last_auto_scan');
+        const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
+        if (!lastScan || new Date(lastScan) < thirtyMinAgo) {
+          logger.info('Queue empty — triggering automatic scan');
+          try {
+            await dbHelpers.run(
+              "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
+              ['last_auto_scan', new Date().toISOString()]
+            );
+            const results = await scanAllCategories();
+            await buildDailyQueue(results);
+          } catch(e) {
+            logger.error('Auto-scan error: ' + e.message);
+          }
+        } else {
+          logger.info('Queue empty but scan ran recently — waiting before next auto-scan');
         }
       }
     } else {
