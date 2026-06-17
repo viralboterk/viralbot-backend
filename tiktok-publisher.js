@@ -5,6 +5,12 @@ const logger = require('./logger');
 const TIKTOK_API = 'https://open.tiktokapis.com/v2';
 const CLIENT_KEY = process.env.TIKTOK_CLIENT_KEY;
 const CLIENT_SECRET = process.env.TIKTOK_CLIENT_SECRET;
+// Until the Content Posting API audit is approved, TikTok rejects
+// PUBLIC_TO_EVERYONE outright (403) for this app. Default to SELF_ONLY so
+// publishing actually succeeds (privately) in the meantime; once the audit
+// is approved, set TIKTOK_PRIVACY_LEVEL=PUBLIC_TO_EVERYONE on Railway — no
+// redeploy needed.
+const PRIVACY_LEVEL = process.env.TIKTOK_PRIVACY_LEVEL || 'SELF_ONLY';
 
 // Generate OAuth URL for account connection
 function getOAuthUrl(accountHandle) {
@@ -46,10 +52,11 @@ async function refreshToken(refresh_token) {
 // Publish video to TikTok
 async function publishVideo(account, videoData) {
   try {
+    logger.info('Publishing with privacy_level=' + PRIVACY_LEVEL + ' for ' + account.handle);
     const initRes = await axios.post(TIKTOK_API + '/post/publish/video/init/', {
       post_info: {
         title: videoData.titre.substring(0, 150),
-        privacy_level: 'PUBLIC_TO_EVERYONE',
+        privacy_level: PRIVACY_LEVEL,
         disable_duet: false,
         disable_comment: false,
         disable_stitch: false,
