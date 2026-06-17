@@ -13,8 +13,51 @@ const s3 = new S3Client({
 });
 
 const BUCKET = process.env.R2_BUCKET_NAME || 'viral-videos';
-const R2_PUBLIC_URL = process.env.R2_PUBLIC_URL || process.env.R2_ENDPOINT + '/' + BUCKET;
+
+// FIX (solution 8): R2_PUBLIC_URL is REQUIRED. R2_ENDPOINT is the private S3 API
+// endpoint and is NEVER reachable by TikTok's servers — silently falling back to
+// it produced URLs that looked valid but returned 403 when TikTok tried to pull
+// them. Fail loudly at startup instead of producing a broken URL silently.
+const R2_PUBLIC_URL = (process.env.R2_PUBLIC_URL || '').trim().replace(/\/+$/, '');
+if (!R2_PUBLIC_URL) {
+  logger.error('FATAL: R2_PUBLIC_URL is not set. R2_ENDPOINT is private and cannot ' +
+    'be used as a fallback — TikTok cannot fetch videos from it. Set R2_PUBLIC_URL ' +
+    'to your r2.dev Public Development URL or custom domain, and make sure that ' +
+    'exact domain is verified in TikTok for Developers > Manage Apps > URL Properties.');
+}
+
 const COBALT_URL = (process.env.COBALT_URL || 'https://cobalt-api-production-6ad6.up.railway.app').trim().replace(/\/+$/, '');
+let COBALT_HOST = null;
+try { COBALT_HOST = new URL(COBALT_URL).host; } catch (e) { /* leave null, logged where used */ }
+
+// Cobalt's actual response schema (confirmed against the official cobalt-kit SDK
+// example) only ever exposes the result link on `res.data.url`, regardless of
+// whether status is "tunnel" or "redirect" — there is no separate `res.data.tunnel`
+// field. The previous code checked for `res.data.tunnel` first, which never
+// existed, so it always fell through to `res.data.url` anyway — but it also never
+// logged *which* mode Cobalt chose, which matters: a "tunnel" response is relayed
+// through Cobalt's own egress (and therefore through API_EXTERNAL_PROXY, if one is
+// configured on the Cobalt service), while a "redirect" response points straight
+// at a googlevideo.com link that viralbot-backend would fetch directly from its
+// own Railway IP, bypassing any proxy entirely. We can't force one mode or the
+// other from here (no confirmed Cobalt parameter for that), so we just log it
+// clearly for visibility, since it directly explains inconsistent download
+// results between videos.
+function extractCobaltResult(res, videoId, label) {
+  if (!res.data || !res.data.url) return null;
+  const url = res.data.url;
+  try { new URL(url); } catch (e) {
+    logger.error('Invalid URL from Cobalt (' + label + ') for ' + videoId + ': ' + url);
+    return null;
+  }
+  let resultHost = null;
+  try { resultHost = new URL(url).host; } catch (e) { /* already validated above */ }
+  const status = res.data.status || 'unknown';
+  const isTunneled = COBALT_HOST && resultHost === COBALT_HOST;
+  logger.info('Cobalt ' + label + ' success for ' + videoId + ' [status=' + status +
+    ', ' + (isTunneled ? 'tunneled-through-cobalt' : 'direct-external-host:' + resultHost) + ']');
+  return url;
+}
 
 // METHOD 1: Private Cobalt instance (self-hosted on Railway)
 async function tryCobaltPrivate(videoId) {
@@ -29,20 +72,12 @@ async function tryCobaltPrivate(videoId) {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
-      timeout: 30000,
+      timeout: 15000,
       maxRedirects: 0,
     });
 
-    if (res.data && res.data.url) {
-      try { new URL(res.data.url); } catch(e) { logger.error('Invalid URL from Cobalt: ' + res.data.url); return null; }
-      logger.info('Private Cobalt success for ' + videoId);
-      return res.data.url;
-    }
-    if (res.data && res.data.tunnel) {
-      try { new URL(res.data.tunnel); } catch(e) { logger.error('Invalid tunnel URL: ' + res.data.tunnel); return null; }
-      logger.info('Private Cobalt tunnel success for ' + videoId);
-      return res.data.tunnel;
-    }
+    const url = extractCobaltResult(res, videoId, 'private');
+    if (url) return url;
     logger.error('Cobalt no URL for ' + videoId + ': ' + JSON.stringify(res.data).substring(0, 200));
     return null;
   } catch(e) {
@@ -66,17 +101,12 @@ async function tryCobaltFallback(videoId) {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
-      timeout: 30000,
+      timeout: 15000,
       maxRedirects: 0,
     });
 
-    if (res.data && res.data.url) {
-      logger.info('Private Cobalt fallback success for ' + videoId);
-      return res.data.url;
-    }
-    if (res.data && res.data.tunnel) {
-      return res.data.tunnel;
-    }
+    const url = extractCobaltResult(res, videoId, 'fallback-480p');
+    if (url) return url;
     logger.error('Cobalt fallback no URL for ' + videoId + ': ' + JSON.stringify(res.data).substring(0, 150));
     return null;
   } catch(e) {
@@ -100,17 +130,12 @@ async function tryCobaltShort(videoId) {
         'Accept': 'application/json',
         'Content-Type': 'application/json',
       },
-      timeout: 30000,
+      timeout: 15000,
       maxRedirects: 0,
     });
 
-    if (res.data && res.data.url) {
-      logger.info('Private Cobalt short URL success for ' + videoId);
-      return res.data.url;
-    }
-    if (res.data && res.data.tunnel) {
-      return res.data.tunnel;
-    }
+    const url = extractCobaltResult(res, videoId, 'short-url');
+    if (url) return url;
     logger.error('Cobalt short URL no URL for ' + videoId + ': ' + JSON.stringify(res.data).substring(0, 150));
     return null;
   } catch(e) {
@@ -121,7 +146,9 @@ async function tryCobaltShort(videoId) {
   }
 }
 
-// Main: try all methods in order
+// Main: try all methods in order. Each call is a FRESH negotiation with Cobalt —
+// never reuse a URL obtained from a previous call, since these links are
+// short-lived / single-use (solution 10: freshness validation).
 async function getYouTubeDirectUrl(videoId) {
   let url = null;
 
@@ -142,33 +169,70 @@ async function getYouTubeUrlFallback(videoId) {
   return tryCobaltFallback(videoId);
 }
 
+// Fetches a direct URL and downloads it IMMEDIATELY (no delay) to minimize the
+// window in which a short-lived Cobalt link can expire (solution 7 + 10).
+async function fetchVideoBuffer(videoId) {
+  const directUrl = await getYouTubeDirectUrl(videoId);
+  if (!directUrl) return { buffer: null, reason: 'no-url' };
+
+  const response = await axios.get(directUrl, {
+    responseType: 'arraybuffer',
+    timeout: 60000,
+    maxContentLength: 150 * 1024 * 1024,
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Referer': 'https://www.youtube.com/',
+    },
+  });
+
+  const videoBuffer = Buffer.from(response.data);
+  return { buffer: videoBuffer, reason: null };
+}
+
 async function downloadAndUploadToR2(videoId, category) {
+  if (!R2_PUBLIC_URL) {
+    logger.error('Aborting download for ' + videoId + ': R2_PUBLIC_URL is not configured.');
+    return null;
+  }
+
   try {
     const r2Key = 'videos/' + category + '/' + videoId + '.mp4';
 
-    let directUrl = await getYouTubeDirectUrl(videoId);
-    if (!directUrl) {
-      logger.error('Could not get direct URL for ' + videoId + ' — all methods failed');
-      return null;
-    }
-
     logger.info('Downloading video ' + videoId + '...');
+    let videoBuffer = null;
 
-    const response = await axios.get(directUrl, {
-      responseType: 'arraybuffer',
-      timeout: 120000,
-      maxContentLength: 150 * 1024 * 1024,
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://www.youtube.com/',
-      },
-    });
+    // First attempt
+    try {
+      const result = await fetchVideoBuffer(videoId);
+      videoBuffer = result.buffer;
+    } catch (downloadErr) {
+      logger.error('Download attempt 1 failed for ' + videoId + ': ' + downloadErr.message);
+    }
 
-    const videoBuffer = Buffer.from(response.data);
-    if (videoBuffer.length < 10000) {
-      logger.error('Downloaded file too small for ' + videoId + ': ' + videoBuffer.length + ' bytes');
+    // FIX (solutions 3 + 10): a 0-byte (or implausibly small) result usually means
+    // the link Cobalt handed us was already stale or single-use-consumed by the
+    // time we fetched it. Retrying with a fully fresh negotiation (not reusing the
+    // old URL) resolves this in many documented cases, so we try once more before
+    // giving up, instead of failing the video outright on the first empty result.
+    if (!videoBuffer || videoBuffer.length < 10000) {
+      if (videoBuffer) {
+        logger.warn('Downloaded file too small for ' + videoId + ': ' + videoBuffer.length +
+          ' bytes — retrying once with a fresh Cobalt negotiation');
+      }
+      try {
+        const retryResult = await fetchVideoBuffer(videoId);
+        videoBuffer = retryResult.buffer;
+      } catch (retryErr) {
+        logger.error('Download retry failed for ' + videoId + ': ' + retryErr.message);
+      }
+    }
+
+    if (!videoBuffer || videoBuffer.length < 10000) {
+      logger.error('Downloaded file too small for ' + videoId + ' after retry: ' +
+        (videoBuffer ? videoBuffer.length : 0) + ' bytes');
       return null;
     }
+
     logger.info('Downloaded ' + videoId + ': ' + (videoBuffer.length / 1024 / 1024).toFixed(1) + 'MB');
 
     await s3.send(new PutObjectCommand({

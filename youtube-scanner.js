@@ -159,30 +159,41 @@ function copyrightSafetyCheck(video) {
 async function scanCategory(category, type = 'both') {
   if (!YOUTUBE_API_KEY) {
     logger.error('YOUTUBE_API_KEY not set');
-    return { recent: [], evergreen: [] };
+    return { recent: [], evergreen: [], quotaExceeded: false };
   }
   logger.info(`Scanning category: ${category} [${type}]`);
   const queries = CATEGORY_QUERIES[category] || CATEGORY_QUERIES.others;
   const results = { recent: [], evergreen: [] };
+  let quotaExceeded = false;
 
   // Recent videos (last 24h)
   if (type === 'both' || type === 'recent') {
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     for (const query of queries.slice(0, 3)) {
-      const ids = await searchShorts(query, 15, yesterday);
-      const details = await getVideoDetails(ids);
-      if (Array.isArray(details)) results.recent.push(...details);
+      try {
+        const ids = await searchShorts(query, 15, yesterday);
+        const details = await getVideoDetails(ids);
+        if (Array.isArray(details)) results.recent.push(...details);
+      } catch (e) {
+        if (e.message === 'QUOTA_EXCEEDED') { quotaExceeded = true; break; }
+        throw e;
+      }
       await sleep(300); // Rate limit protection
     }
   }
 
   // Evergreen videos (last 6 years, best performing)
-  if (type === 'both' || type === 'evergreen') {
+  if (!quotaExceeded && (type === 'both' || type === 'evergreen')) {
     const sixYearsAgo = new Date(Date.now() - 6 * 365 * 24 * 60 * 60 * 1000).toISOString();
     for (const query of queries.slice(3)) {
-      const ids = await searchShorts(query, 15, sixYearsAgo);
-      const details = await getVideoDetails(ids);
-      if (Array.isArray(details)) results.evergreen.push(...details);
+      try {
+        const ids = await searchShorts(query, 15, sixYearsAgo);
+        const details = await getVideoDetails(ids);
+        if (Array.isArray(details)) results.evergreen.push(...details);
+      } catch (e) {
+        if (e.message === 'QUOTA_EXCEEDED') { quotaExceeded = true; break; }
+        throw e;
+      }
       await sleep(300);
     }
   }
@@ -212,9 +223,10 @@ async function scanCategory(category, type = 'both') {
   await dbHelpers.saveScannedVideos(category, recentFiltered, 'recent');
   await dbHelpers.saveScannedVideos(category, evergreenFiltered, 'evergreen');
   
-  logger.info('Category ' + category + ': ' + totalSelected + ' selected (' + recentFiltered.length + ' recent + ' + evergreenFiltered.length + ' evergreen)');
+  logger.info('Category ' + category + ': ' + totalSelected + ' selected (' + recentFiltered.length + ' recent + ' + evergreenFiltered.length + ' evergreen)' +
+    (quotaExceeded ? ' [quota exceeded mid-scan]' : ''));
 
-  return { recent: recentFiltered, evergreen: evergreenFiltered };
+  return { recent: recentFiltered, evergreen: evergreenFiltered, quotaExceeded };
 }
 
 // Scan all 5 categories
@@ -222,12 +234,21 @@ async function scanAllCategories() {
   logger.info('Starting full YouTube scan — all 5 categories');
   const results = {};
   const categories = ['movies', 'stream', 'sports', 'divert', 'others'];
+  let quotaExceeded = false;
   for (const cat of categories) {
     results[cat] = await scanCategory(cat);
+    if (results[cat].quotaExceeded) {
+      quotaExceeded = true;
+      logger.warn('Quota exceeded while scanning ' + cat + ' — stopping remaining categories for this run');
+      break; // Google's quota is genuinely exhausted; trying the next categories would just waste more failed-call units
+    }
     await sleep(1000);
   }
+  // Metadata key, not a category — consumers must filter keys starting with
+  // '_' before treating Object.values(results) as "one entry per category".
+  results._quotaExceeded = quotaExceeded;
   await dbHelpers.setStat('last_scan', new Date().toISOString());
-  logger.info('Full scan complete');
+  logger.info('Full scan complete' + (quotaExceeded ? ' (quota exceeded mid-scan)' : ''));
   return results;
 }
 

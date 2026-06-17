@@ -6,6 +6,7 @@ const { initScheduler } = require('./scheduler');
 const { scanAllCategories } = require('./youtube-scanner');
 const { getOAuthUrl, exchangeCodeForToken } = require('./tiktok-publisher');
 const logger = require('./logger');
+const { isWithinCurrentQuotaWindow } = require('./quota-window');
 
 const app = express();
 app.use(express.json());
@@ -353,21 +354,34 @@ async function start() {
       // Only scan if not already done today — avoids wasting YouTube quota on restarts
       setTimeout(async () => {
         try {
+          const { isQuotaAvailable, markQuotaExhausted } = require('./scheduler');
           const lastScan = await dbHelpers.getStat('last_scan');
-          const today = new Date().toDateString();
-          const lastScanDate = lastScan ? new Date(lastScan).toDateString() : null;
-          if (lastScanDate === today) {
-            logger.info('Initial scan skipped — already ran today');
+          if (isWithinCurrentQuotaWindow(lastScan)) {
+            logger.info('Initial scan skipped — a scan already ran in the current quota window (last: ' + lastScan + ')');
+            return;
+          }
+          if (!(await isQuotaAvailable())) {
+            logger.info('Initial scan skipped — quota marked exhausted for the current window');
             return;
           }
           logger.info('Running initial scan...');
           const results = await scanAllCategories();
-          const { buildDailyQueue } = require('./scheduler');
-          await buildDailyQueue(results);
-          await dbHelpers.run(
-            "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
-            ['last_scan', new Date().toISOString()]
-          );
+          const categoryKeys = Object.keys(results).filter(k => !k.startsWith('_'));
+          const allEmpty = categoryKeys.every(k => {
+            const r = results[k];
+            return (!r.recent || r.recent.length === 0) && (!r.evergreen || r.evergreen.length === 0);
+          });
+          if (results._quotaExceeded || allEmpty) {
+            await markQuotaExhausted();
+          }
+          if (!allEmpty) {
+            const { buildDailyQueue } = require('./scheduler');
+            await buildDailyQueue(results);
+            await dbHelpers.run(
+              "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
+              ['last_scan', new Date().toISOString()]
+            );
+          }
           logger.info('Initial scan complete');
         } catch (err) {
           logger.error('Initial scan error: ' + err.message);

@@ -5,6 +5,7 @@ const { downloadAndUploadToR2, deleteFromR2 } = require('./video-downloader');
 const { generateContent } = require('./ai-editor');
 const { publishVideo } = require('./tiktok-publisher');
 const logger = require('./logger');
+const { lastQuotaReset, nextQuotaReset, isWithinCurrentQuotaWindow } = require('./quota-window');
 
 // Random delay between 0 and 120 seconds
 function randomDelay() {
@@ -14,15 +15,19 @@ function randomDelay() {
 
 // Refresh TikTok token if needed before publishing
 
-// Track quota exhaustion — persisted in DB to survive restarts
+// Track quota exhaustion — persisted in DB to survive restarts.
+// FIX (solution 6): the YouTube quota actually resets at midnight Pacific Time
+// (07:00 or 08:00 UTC depending on DST), not at the next UTC midnight. The old
+// code used `setUTCHours(24,0,0,0)`, which could overshoot the real reset by up
+// to ~19 hours — meaning the bot would needlessly sit idle long after the quota
+// had already refilled.
 async function markQuotaExhausted() {
-  const midnight = new Date();
-  midnight.setUTCHours(24, 0, 0, 0);
+  const resetAt = nextQuotaReset();
   await dbHelpers.run(
     "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
-    ['quota_exhausted_until', midnight.toISOString()]
+    ['quota_exhausted_until', resetAt.toISOString()]
   );
-  logger.warn('YouTube quota exhausted — scans paused until ' + midnight.toISOString());
+  logger.warn('YouTube quota exhausted — scans paused until ' + resetAt.toISOString());
 }
 
 async function isQuotaAvailable() {
@@ -150,8 +155,26 @@ async function buildDailyQueue(scanResults) {
   logger.info('Daily queue built successfully');
 }
 
-// Process queue — publish due videos
+// Process queue — publish due videos.
+// Guarded against overlapping runs: with up to 2 items per account per cycle at
+// a 240s worst-case timeout each, a single run could in theory exceed the 5-minute
+// cron interval. Without this guard, node-cron would happily start a second
+// concurrent run on top of one still in progress.
+let isProcessingQueue = false;
 async function processQueue() {
+  if (isProcessingQueue) {
+    logger.info('processQueue skipped — previous run still in progress');
+    return;
+  }
+  isProcessingQueue = true;
+  try {
+    await processQueueInner();
+  } finally {
+    isProcessingQueue = false;
+  }
+}
+
+async function processQueueInner() {
   const now = new Date();
   const hour = now.getHours();
 
@@ -179,9 +202,13 @@ async function processQueue() {
         // Step 1: Download YouTube video and upload to R2 (with 3min timeout)
         logger.info('Downloading video ' + item.video_id + ' for ' + account.handle);
         let r2Url = null;
+        // Budget: video-downloader.js tries up to 3 Cobalt negotiation methods
+        // (15s each) + 1 download (60s) per cycle = 105s worst case, and retries
+        // the whole cycle once on an empty result = up to 210s. 240s leaves a
+        // 30s margin above that worst case instead of cutting it off mid-retry.
         try {
           const downloadPromise = downloadAndUploadToR2(item.video_id, item.category);
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Download timeout')), 180000));
+          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Download timeout')), 240000));
           r2Url = await Promise.race([downloadPromise, timeoutPromise]);
         } catch(downloadErr) {
           logger.error('Download error for ' + item.video_id + ': ' + downloadErr.message);
@@ -224,31 +251,80 @@ async function processQueue() {
 
 // Initialize all cron jobs
 function initScheduler() {
-  // Daily scan at 05:00 UTC (07:00 Paris été / 06:00 Paris hiver)
-  cron.schedule('0 5 * * *', async () => {
-    logger.info('=== DAILY SCAN STARTED ===');
-    try {
-      const results = await scanAllCategories();
-          // Check if quota was exhausted during scan
-          const allEmpty = Object.values(results).every(r => (!r.recent || r.recent.length === 0) && (!r.evergreen || r.evergreen.length === 0));
-          if (allEmpty) {
-            await markQuotaExhausted();
-          } else {
-            // Save last scan time
-            await dbHelpers.run(
-              "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
-              ['last_scan', new Date().toISOString()]
-            );
-            await dbHelpers.run(
-              "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
-              ['last_auto_scan', new Date().toISOString()]
-            );
-            await buildDailyQueue(results);
-          }
-      logger.info('=== DAILY SCAN COMPLETE ===');
-    } catch (err) {
-      logger.error(`Daily scan error: ${err.message}`);
+  // Shared lock: the daily-scan cron below (08:15 UTC) falls inside the range of
+  // the every-5-minutes queue cron (6-21), so both could try to trigger a scan in
+  // the same tick right after the quota window opens. This lock makes sure only
+  // one scan runs at a time regardless of which cron triggered it.
+  let isScanning = false;
+  async function runGuardedScan(scanFn) {
+    if (isScanning) {
+      logger.info('Scan skipped — another scan is already in progress');
+      return;
     }
+    isScanning = true;
+    try {
+      await scanFn();
+    } finally {
+      isScanning = false;
+    }
+  }
+
+  // FIX (solution 6): the daily scan used to fire at 05:00 UTC, which is BEFORE
+  // the real YouTube quota reset (07:00 UTC in summer / 08:00 UTC in winter — see
+  // quota-window.js). That meant it ran on whatever quota was left over from the
+  // *previous* window instead of a fresh 10,000-unit budget, and it never checked
+  // whether a scan (e.g. the one on container startup) had already consumed most
+  // of that same window. Moved to 08:15 UTC — safely after the reset year-round —
+  // and added an explicit "already scanned this window?" guard as a second line
+  // of defense, the same pattern already used by the queue-empty cron below.
+  cron.schedule('15 8 * * *', async () => {
+    await runGuardedScan(async () => {
+      logger.info('=== DAILY SCAN STARTED ===');
+      try {
+        const lastScan = await dbHelpers.getStat('last_scan');
+        if (isWithinCurrentQuotaWindow(lastScan)) {
+          logger.info('Daily scan skipped — a scan already ran in the current quota window (last: ' +
+            lastScan + ', window started: ' + lastQuotaReset().toISOString() + ')');
+          return;
+        }
+        if (!(await isQuotaAvailable())) {
+          logger.info('Daily scan skipped — quota marked exhausted for the current window');
+          return;
+        }
+
+        const results = await scanAllCategories();
+            // Check if quota was exhausted during scan. Two signals: the explicit
+            // quotaExceeded flag (reliable — set when a 429 was actually hit), and
+            // the allEmpty heuristic (kept as a fallback, e.g. for a bad API key).
+            // categoryKeys excludes the _quotaExceeded metadata key so it isn't
+            // mistaken for a 6th category.
+            const categoryKeys = Object.keys(results).filter(k => !k.startsWith('_'));
+            const allEmpty = categoryKeys.every(k => {
+              const r = results[k];
+              return (!r.recent || r.recent.length === 0) && (!r.evergreen || r.evergreen.length === 0);
+            });
+            if (results._quotaExceeded || allEmpty) {
+              await markQuotaExhausted();
+            }
+            if (!allEmpty) {
+              // Save last scan time and queue whatever was gathered — even if
+              // quota ran out partway through, don't discard categories that
+              // succeeded before that point.
+              await dbHelpers.run(
+                "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
+                ['last_scan', new Date().toISOString()]
+              );
+              await dbHelpers.run(
+                "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
+                ['last_auto_scan', new Date().toISOString()]
+              );
+              await buildDailyQueue(results);
+            }
+        logger.info('=== DAILY SCAN COMPLETE ===');
+      } catch (err) {
+        logger.error(`Daily scan error: ${err.message}`);
+      }
+    });
   });
 
   // Process queue every 5 minutes (06:00–22:00)
@@ -262,23 +338,35 @@ function initScheduler() {
         const lastScan = await dbHelpers.getStat('last_auto_scan');
         const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
         if (!lastScan || new Date(lastScan) < thirtyMinAgo) {
-          logger.info('Queue empty — triggering automatic scan');
-          try {
-            await dbHelpers.run(
-              "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
-              ['last_auto_scan', new Date().toISOString()]
-            );
-            const results = await scanAllCategories();
-            await buildDailyQueue(results);
-          } catch(e) {
-            logger.error('Auto-scan error: ' + e.message);
-          }
+          await runGuardedScan(async () => {
+            logger.info('Queue empty — triggering automatic scan');
+            try {
+              await dbHelpers.run(
+                "INSERT INTO system_stats (key, value, updated_at) VALUES ($1, $2, NOW()) ON CONFLICT (key) DO UPDATE SET value = $2, updated_at = NOW()",
+                ['last_auto_scan', new Date().toISOString()]
+              );
+              const results = await scanAllCategories();
+              const categoryKeys = Object.keys(results).filter(k => !k.startsWith('_'));
+              const allEmpty = categoryKeys.every(k => {
+                const r = results[k];
+                return (!r.recent || r.recent.length === 0) && (!r.evergreen || r.evergreen.length === 0);
+              });
+              if (results._quotaExceeded || allEmpty) {
+                await markQuotaExhausted();
+              }
+              if (!allEmpty) {
+                await buildDailyQueue(results);
+              }
+            } catch(e) {
+              logger.error('Auto-scan error: ' + e.message);
+            }
+          });
         } else {
           logger.info('Queue empty but scan ran recently — waiting before next auto-scan');
         }
       }
     } else {
-      logger.info('Queue empty but YouTube quota exhausted — waiting for reset at midnight UTC');
+      logger.info('Queue empty but YouTube quota exhausted — waiting for reset at ' + nextQuotaReset().toISOString());
     }
     await processQueue();
   });
@@ -302,4 +390,4 @@ function initScheduler() {
   logger.info('✅ Scheduler initialized — all cron jobs active');
 }
 
-module.exports = { initScheduler, buildDailyQueue, scanAllCategories };
+module.exports = { initScheduler, buildDailyQueue, scanAllCategories, isQuotaAvailable, markQuotaExhausted };
