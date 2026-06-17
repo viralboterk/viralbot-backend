@@ -568,6 +568,9 @@ function go(id,btn){
   if(id==='top48')renderVideos();
   if(id==='categories')renderCatDetail();
   if(id==='comptes')renderAccounts();
+  if(id==='config')initConfig();
+  if(id==='edition')updateVidSel();
+  if(id==='strikes')initStrikes();
   if(window.innerWidth<=768){document.getElementById('sidebar').classList.remove('open');document.getElementById('overlay').classList.remove('open');}
 }
 function toggleMenu(){document.getElementById('sidebar').classList.toggle('open');document.getElementById('overlay').classList.toggle('open');}
@@ -717,7 +720,7 @@ function renderCatDetail(){
 function initVideoFilters(){
   document.getElementById('cat-filters').innerHTML=[['all','🎬 Toutes les catégories'],...CATS.map(c=>[c.id,c.icon+' '+c.label])].map(([id,lbl])=>`<button class="fbtn ${id==='all'?'active':''} ${id!=='all'?'cat-f-'+id:''}" onclick="setCatFilter('${id}',this)">${lbl}</button>`).join('');
   document.getElementById('mix-filters').innerHTML=[['all','📋 Tout le mix'],['recent','🕐 Récentes (24h) uniquement'],['ever','⭐ Evergreen (6 ans) uniquement']].map(([id,lbl],i)=>`<button class="fbtn ${i===0?'active':''}" onclick="setMixFilter('${id}',this)">${lbl}</button>`).join('');
-  VIDEOS.forEach(v=>{const o=document.createElement('option');o.value=v.rank;o.textContent=`#${v.rank} [${getCat(v.cat)?.icon||'?'}] ${v.title.substring(0,45)}...`;document.getElementById('vid-sel').appendChild(o);});
+  updateVidSel();
 }
 
 function setCatFilter(id,btn){
@@ -766,9 +769,18 @@ function renderVideos(){
 
 // ===== FILTRES =====
 function initFilters(){
-  const mods=[['🎵','Musique copyright','Détection audio — empreinte acoustique'],['⚠️','Contenu violent','IA visuelle — sang, armes, accidents'],['🚫','Logos & marques','Nike, Apple, Disney... auto-écartés'],['🔞','Contenu adulte','Filtre IA — rejet automatique'],['📋','Blacklist chaînes','Chaînes bloquées après 1er rejet'],['🔍','Déduplication','Empreinte frame-by-frame inter-catégories'],['⏱️','Durée hors 60-90s','Rejet automatique si hors critères'],['🔁','Anti-rediffusion','Base de données des vidéos déjà publiées']];
-  document.getElementById('filter-mods').innerHTML='<div style="font-size:11px;color:var(--text3);margin-bottom:10px">⚠️ Roadmap — aucun de ces filtres n\'est branché à une vraie détection IA pour l\'instant. La durée 60-90s et l\'anti-rediffusion (déjà publiées) sont les seuls réellement appliqués par le serveur.</div>' + mods.map(([i,n,d])=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:19px;flex-shrink:0">${i}</span><div style="flex:1"><div style="font-size:13px;font-weight:600">${n}</div><div style="font-size:11px;color:var(--text2)">${d}</div></div></div>`).join('');
-  document.getElementById('filter-stats').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">Pas de suivi réel des rejets par catégorie pour l\'instant — ces filtres ne sont pas encore implémentés côté serveur.</div>';
+  const mods=[
+    ['🎵','Musique copyright','Filtre par mots-clés (chaînes type labels/majors, titres "official music video"/"full movie"...) — pas d\'analyse audio réelle',true],
+    ['⚠️','Contenu violent','IA visuelle — sang, armes, accidents',false],
+    ['🚫','Logos & marques','Nike, Apple, Disney... auto-écartés',false],
+    ['🔞','Contenu adulte','Filtre IA — rejet automatique',false],
+    ['📋','Blacklist chaînes','Chaînes bloquées après 1er rejet',false],
+    ['🔍','Déduplication','Même vidéo + même catégorie jamais stockée deux fois (contrainte base de données) — pas de comparaison visuelle inter-catégories',true],
+    ['⏱️','Durée hors 60-90s','Rejet automatique si hors critères',true],
+    ['🔁','Anti-rediffusion','Base de données des vidéos déjà publiées',true],
+  ];
+  document.getElementById('filter-mods').innerHTML = mods.map(([i,n,d,real])=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:19px;flex-shrink:0">${i}</span><div style="flex:1"><div style="font-size:13px;font-weight:600">${n}</div><div style="font-size:11px;color:var(--text2)">${d}</div></div><span class="badge ${real?'b-green':'b-gray'}" style="flex-shrink:0">${real?'✅ Réel':'🔜 Prévu'}</span></div>`).join('');
+  document.getElementById('filter-stats').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">Pas de suivi des rejets par catégorie pour les filtres IA marqués "Prévu" — ils ne sont pas encore implémentés côté serveur.</div>';
   document.getElementById('blacklist').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">Aucune blacklist de chaînes implémentée côté serveur pour l\'instant.</div>';
 }
 
@@ -1185,6 +1197,7 @@ function loadRealAccounts() {
       if (document.getElementById('cat-stats')) renderCatStats();
       if (document.getElementById('cat-detail-grid')) renderCatDetail();
       if (document.getElementById('strikes-proto')) initStrikes();
+      if (document.getElementById('apis-list')) initConfig();
     })
     .catch(function() {
       addLog('warn', 'Impossible de charger les comptes — verifier Railway');
@@ -1332,7 +1345,7 @@ window.addEventListener('load', function() {
       var sub = document.getElementById('sys-sub');
       if (sub) sub.textContent = info.phase || 'Phase 1 — YouTube';
       addLog('success', 'Serveur actif — ' + Math.floor((info.uptime||0)/60) + ' min uptime');
-      if (info.lastScan) { lastScanSeen = info.lastScan; addLog('info', 'Dernier scan : ' + new Date(info.lastScan).toLocaleString('fr-FR')); }
+      if (info.lastScan) { lastScanSeen = info.lastScan; addLog('info', 'Dernier scan : ' + new Date(info.lastScan).toLocaleString('fr-FR')); if (document.getElementById('apis-list')) initConfig(); }
     })
     .catch(function() {
       addLog('warn', 'Serveur non joignable');
@@ -1384,6 +1397,7 @@ function loadRealVideos() {
       addLog('success', data.length + ' vidéos chargées depuis Railway');
       if(document.getElementById('vid-list')) renderVideos();
       if(document.getElementById('cat-stats')) renderCatStats();
+      if(document.getElementById('vid-sel')) updateVidSel();
     }).catch(function() { addLog('warn', 'Impossible de charger les vidéos'); });
 }
 
