@@ -104,7 +104,8 @@ async function publishVideo(account, videoData) {
     throw new Error('TikTok publish timeout');
 
   } catch (err) {
-    logger.error('TikTok publish error for ' + account.handle + ': ' + err.message);
+    const tiktokError = err.response && err.response.data;
+    logger.error('TikTok publish error for ' + account.handle + ': ' + err.message + (tiktokError ? ' | TikTok response: ' + JSON.stringify(tiktokError) : ' | no response body'));
     if (err.response && err.response.status === 401) {
       dbHelpers.updateAccount(account.handle, { status: 'token_expired' });
     }
