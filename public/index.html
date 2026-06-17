@@ -910,40 +910,63 @@ function assignCat(accId, catId){
 }
 
 // ===== PLANNING =====
-function initPlanning(){
-  const vids_by_cat={
-    movies:['Scène culte 🎬','Trailer incroyable 🍿','Plot twist 😱','Moment épique 🎭'],
-    stream:['Gotaga 40 kills 🏆','Clip gaming 🎮','Moment viral 🔥','Réaction drôle 😂'],
-    sports:['But impossible ⚽','Dunk incroyable 🏀','Record battu 🏆','Exploit sportif 💪'],
-    divert:['Chat drôle 🐱','Magie de rue 🪄','POV viral 😱','Chien humain 🐕'],
-    others:['Invention folle 💡','Vie hack 🔑','Moment WTF 🤯','Talent caché 🌟'],
-  };
-  const slots=Array.from({length:18},(_,i)=>{
-    const h=String(i+6).padStart(2,'0')+'h00';
-    // Assign to accounts with cats
-    const activeAcc=ACCOUNTS.filter(a=>a.cat&&a.status!=='pending').slice(0,2);
-    const slots2=activeAcc.map(acc=>{
-      const cat=acc.cat;
-      const pool=vids_by_cat[cat]||['Vidéo viral 🔥'];
-      const v=Math.random()>.25?pool[Math.floor(Math.random()*pool.length)]:null;
-      return {acc,v};
-    });
-    return {h,slots2};
-  });
-  document.getElementById('planning-content').innerHTML=`
-    <div style="display:grid;grid-template-columns:56px 1fr 1fr;gap:6px;margin-bottom:8px">
-      <div style="font-size:10px;font-weight:700;color:var(--text3);text-transform:uppercase">Heure</div>
-      ${ACCOUNTS.filter(a=>a.cat&&a.status!=='pending').slice(0,2).map(a=>{const cat=getCat(a.cat);return `<div style="font-size:10px;font-weight:700;color:${cat?.col||'var(--text3)'};text-transform:uppercase">${cat?.icon||''} ${a.handle}</div>`;}).join('')}
-    </div>
-    <div class="plan-grid">
-      ${slots.map(s=>`<div class="plan-hour">
-        <div style="font-size:11px;font-weight:700;color:var(--text2)">${s.h}</div>
-        ${s.slots2.map(sl=>{const cat=getCat(sl.acc.cat);return `<div class="plan-slot ${sl.v?'filled':''}" style="${sl.v?`border-color:${cat?.col||'var(--border2)'}40;background:${cat?.light||'var(--purple-l)'}`:''}">${sl.v?`<div style="width:6px;height:6px;border-radius:50%;background:${cat?.col||'var(--purple)'};flex-shrink:0"></div><span style="font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sl.v}</span>`:`<span style="font-size:11px;color:var(--text3)">Libre</span>`}</div>`;}).join('')}
-      </div>`).join('')}
-    </div>
-    <div style="margin-top:12px;padding:10px 14px;background:var(--purple-l);border-radius:var(--r);border:1px solid var(--border2);font-size:12px;color:var(--purple)">
-      📱 Les 10 comptes suivent chacun le planning de leur catégorie assignée — 1 vidéo toutes les 20 minutes de 6h00 à 22h00 soit 48 vidéos/jour.
+async function initPlanning(){
+  const container = document.getElementById('planning-content');
+  container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)"><div class="spinner"></div> Chargement de la file...</div>';
+  let queue = [];
+  try {
+    const r = await fetch('/api/queue');
+    queue = await r.json();
+  } catch(e) {
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)">Impossible de charger la file d\'attente.</div>';
+    return;
+  }
+  const pending = (queue||[]).filter(q=>q.status==='pending').slice(0,30);
+  if(!pending.length){
+    container.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)">Aucune vidéo en attente pour le moment.</div>';
+    return;
+  }
+  container.innerHTML = `
+    <div style="font-size:11px;color:var(--text3);margin-bottom:10px">${pending.length} vidéo${pending.length>1?'s':''} en attente — publiée automatiquement à l'heure prévue, ou tu peux la publier dès maintenant.</div>
+    <div style="display:flex;flex-direction:column;gap:8px">
+    ${pending.map(item=>{
+      const cat = getCat(item.category);
+      const time = new Date(item.scheduled_at).toLocaleString('fr-FR',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      return `<div class="card" style="margin:0;padding:12px 14px;display:flex;align-items:center;gap:12px" id="q-row-${item.id}">
+        <div style="width:8px;height:8px;border-radius:50%;background:${cat?.col||'var(--purple)'};flex-shrink:0"></div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.title||'(sans titre)'}</div>
+          <div style="font-size:11px;color:var(--text2)">${cat?.icon||''} ${item.account_id} · prévu ${time}</div>
+        </div>
+        <button class="btn btn-primary btn-sm" id="q-btn-${item.id}" onclick="publishNow(${item.id})">▶ Publier maintenant</button>
+      </div>`;
+    }).join('')}
     </div>`;
+}
+
+async function publishNow(id){
+  const btn = document.getElementById('q-btn-'+id);
+  if(!btn) return;
+  const original = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<div class="spinner"></div>';
+  try {
+    const r = await fetch('/api/queue/'+id+'/publish-now', {method:'POST'});
+    const data = await r.json();
+    if(data.success){
+      notify('Vidéo publiée sur TikTok ✅','info');
+      const row = document.getElementById('q-row-'+id);
+      if(row) row.remove();
+    } else {
+      notify('Échec de la publication : '+(data.reason||data.error||'erreur inconnue'),'warn');
+      btn.disabled = false;
+      btn.innerHTML = original;
+    }
+  } catch(e){
+    notify('Erreur réseau lors de la publication','warn');
+    btn.disabled = false;
+    btn.innerHTML = original;
+  }
 }
 
 // ===== STRIKES =====

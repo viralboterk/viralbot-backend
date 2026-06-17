@@ -174,6 +174,74 @@ async function processQueue() {
   }
 }
 
+// Runs the full real publish pipeline for a single queue item: download the
+// source video, upload it to R2, publish to TikTok, and update the DB
+// accordingly. This is the single source of truth for "what publishing a
+// video actually does" — both the cron loop below and the dashboard's manual
+// "Publier maintenant" button call this exact function, so there is no
+// separate/fake code path for the manual trigger.
+async function publishQueueItem(account, item) {
+  try {
+    logger.info('Publishing to ' + account.handle + ': ' + item.title);
+    account = await ensureValidToken(account);
+
+    // Check daily limit (48 max)
+    const todayCount = await dbHelpers.getTodayCount(account.handle);
+    if (todayCount >= 48) {
+      logger.warn(`${account.handle} reached daily limit (48)`);
+      return { success: false, reason: 'daily_limit_reached' };
+    }
+
+    // Step 1: Download YouTube video and upload to R2 (with 4min timeout)
+    logger.info('Downloading video ' + item.video_id + ' for ' + account.handle);
+    let r2Url = null;
+    // Budget: video-downloader.js tries up to 3 Cobalt negotiation methods
+    // (15s each) + 1 download (60s) per cycle = 105s worst case, and retries
+    // the whole cycle once on an empty result = up to 210s. 240s leaves a
+    // 30s margin above that worst case instead of cutting it off mid-retry.
+    try {
+      const downloadPromise = downloadAndUploadToR2(item.video_id, item.category);
+      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Download timeout')), 240000));
+      r2Url = await Promise.race([downloadPromise, timeoutPromise]);
+    } catch(downloadErr) {
+      logger.error('Download error for ' + item.video_id + ': ' + downloadErr.message);
+    }
+    if (!r2Url) {
+      logger.error('Could not get R2 URL for ' + item.video_id + ' — skipping');
+      await dbHelpers.markQueueDone(item.id, 'failed');
+      return { success: false, reason: 'download_failed' };
+    }
+
+    // Update queue item with R2 URL
+    await dbHelpers.run('UPDATE video_queue SET r2_url = $1 WHERE id = $2', [r2Url, item.id]);
+
+    // Step 2: Publish to TikTok with real R2 URL
+    const result = await publishVideo(account, {
+      titre: item.title,
+      description: item.description,
+      r2Url: r2Url,
+    });
+
+    if (result.success) {
+      await dbHelpers.markPublished(item.video_id, account.handle, item.category, item.title);
+      await dbHelpers.markQueueDone(item.id, 'published');
+      // Clean up R2 after successful publish
+      const r2Key = 'videos/' + item.category + '/' + item.video_id + '.mp4';
+      setTimeout(() => deleteFromR2(r2Key), 60000); // Delete after 1 min
+      logger.info('✅ Published: ' + item.title + ' → ' + account.handle);
+      return { success: true, publishId: result.publishId };
+    } else {
+      await dbHelpers.markQueueDone(item.id, 'failed');
+      logger.error('❌ Failed: ' + item.title + ' → ' + account.handle);
+      return { success: false, reason: result.error || 'publish_failed' };
+    }
+  } catch (err) {
+    logger.error(`publishQueueItem error for item ${item.id}: ${err.message}`);
+    await dbHelpers.markQueueDone(item.id, 'error');
+    return { success: false, reason: err.message };
+  }
+}
+
 async function processQueueInner() {
   const now = new Date();
   const hour = now.getHours();
@@ -189,58 +257,7 @@ async function processQueueInner() {
 
     for (const item of dueItems.slice(0, 2)) { // Max 2 per cycle per account
       try {
-        logger.info('Publishing to ' + account.handle + ': ' + item.title);
-        account = await ensureValidToken(account);
-
-        // Check daily limit (48 max)
-        const todayCount = await dbHelpers.getTodayCount(account.handle);
-        if (todayCount >= 48) {
-          logger.warn(`${account.handle} reached daily limit (48)`);
-          break;
-        }
-
-        // Step 1: Download YouTube video and upload to R2 (with 3min timeout)
-        logger.info('Downloading video ' + item.video_id + ' for ' + account.handle);
-        let r2Url = null;
-        // Budget: video-downloader.js tries up to 3 Cobalt negotiation methods
-        // (15s each) + 1 download (60s) per cycle = 105s worst case, and retries
-        // the whole cycle once on an empty result = up to 210s. 240s leaves a
-        // 30s margin above that worst case instead of cutting it off mid-retry.
-        try {
-          const downloadPromise = downloadAndUploadToR2(item.video_id, item.category);
-          const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Download timeout')), 240000));
-          r2Url = await Promise.race([downloadPromise, timeoutPromise]);
-        } catch(downloadErr) {
-          logger.error('Download error for ' + item.video_id + ': ' + downloadErr.message);
-        }
-        if (!r2Url) {
-          logger.error('Could not get R2 URL for ' + item.video_id + ' — skipping');
-          await dbHelpers.markQueueDone(item.id, 'failed');
-          continue;
-        }
-
-        // Update queue item with R2 URL
-        await dbHelpers.run('UPDATE video_queue SET r2_url = $1 WHERE id = $2', [r2Url, item.id]);
-
-        // Step 2: Publish to TikTok with real R2 URL
-        const result = await publishVideo(account, {
-          titre: item.title,
-          description: item.description,
-          r2Url: r2Url,
-        });
-
-        if (result.success) {
-          await dbHelpers.markPublished(item.video_id, account.handle, item.category, item.title);
-          await dbHelpers.markQueueDone(item.id, 'published');
-          // Clean up R2 after successful publish
-          const r2Key = 'videos/' + item.category + '/' + item.video_id + '.mp4';
-          setTimeout(() => deleteFromR2(r2Key), 60000); // Delete after 1 min
-          logger.info('✅ Published: ' + item.title + ' → ' + account.handle);
-        } else {
-          await dbHelpers.markQueueDone(item.id, 'failed');
-          logger.error('❌ Failed: ' + item.title + ' → ' + account.handle);
-        }
-
+        await publishQueueItem(account, item);
       } catch (err) {
         logger.error(`Queue processing error: ${err.message}`);
         await dbHelpers.markQueueDone(item.id, 'error');
@@ -390,4 +407,4 @@ function initScheduler() {
   logger.info('✅ Scheduler initialized — all cron jobs active');
 }
 
-module.exports = { initScheduler, buildDailyQueue, scanAllCategories, isQuotaAvailable, markQuotaExhausted };
+module.exports = { initScheduler, buildDailyQueue, scanAllCategories, isQuotaAvailable, markQuotaExhausted, publishQueueItem };

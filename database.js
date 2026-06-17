@@ -143,6 +143,10 @@ const dbHelpers = {
     );
   },
 
+  getAccountByHandle: async (handle) => {
+    return get('SELECT * FROM accounts WHERE handle = $1', [handle]);
+  },
+
   updateAccount: async (handle, fields) => {
     const keys = Object.keys(fields);
     const values = Object.values(fields);

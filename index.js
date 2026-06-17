@@ -253,6 +253,30 @@ app.get('/api/queue', async (req, res) => {
   }
 });
 
+// Manual publish trigger from the dashboard. Calls the exact same
+// publishQueueItem function the cron uses every 5 minutes — this is not a
+// separate/simulated path, it runs the real download -> R2 -> TikTok pipeline.
+app.post('/api/queue/:id/publish-now', async (req, res) => {
+  try {
+    const item = await dbHelpers.get('SELECT * FROM video_queue WHERE id = $1', [req.params.id]);
+    if (!item) {
+      return res.status(404).json({ error: 'Vidéo introuvable dans la file' });
+    }
+    if (item.status !== 'pending') {
+      return res.status(400).json({ error: `Cette vidéo a déjà le statut "${item.status}"` });
+    }
+    const account = await dbHelpers.getAccountByHandle(item.account_id);
+    if (!account || !account.access_token) {
+      return res.status(400).json({ error: 'Compte introuvable ou non connecté' });
+    }
+    const { publishQueueItem } = require('./scheduler');
+    const result = await publishQueueItem(account, item);
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/logs', async (req, res) => {
   try {
     res.json(await dbHelpers.all('SELECT * FROM scan_log ORDER BY scanned_at DESC LIMIT 50'));
