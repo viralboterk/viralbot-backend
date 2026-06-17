@@ -545,8 +545,7 @@ const ACCOUNTS = []; // Loaded from Railway on startup
 let catFilter = 'all';
 let mixFilter = 'all';
 let actLogs = [];
-let pipeLines = [];
-let scanned = 0;
+let lastScanSeen = null;
 let ttIdx = 0;
 let ttVids = [];
 
@@ -584,55 +583,30 @@ function catBadge(catId){
 
 // ===== DASHBOARD =====
 function initDashboard(){
-  scanned = CATS.length * 48 * Math.floor(Math.random()*20+30);
-  const total = ACCOUNTS.reduce((s,a)=>s+a.pub,0);
   document.getElementById('dash-metrics').innerHTML=[
-    {lbl:'Shorts scannés (YouTube)',val:scanned.toLocaleString('fr-FR'),sub:'5 catégories · en temps réel',icon:'▶️',col:'var(--red)'},
-    {lbl:'Vidéos sélectionnées',val:'240',sub:'48 × 5 catégories',icon:'🏆',col:'var(--purple)'},
-    {lbl:'Publiées aujourd\'hui',val:total,sub:'10 comptes TikTok',icon:'📱',col:'var(--green)'},
-    {lbl:'Strikes actifs',val:'0',sub:'Tous les comptes OK',icon:'✅',col:'var(--green)'},
-  ].map(m=>`<div class="metric-card" style="border-top:3px solid ${m.col}"><div class="metric-glow" style="background:${m.col}"></div><div class="metric-icon">${m.icon}</div><div class="metric-lbl">${m.lbl}</div><div class="metric-val">${m.val}</div><div class="metric-sub">${m.sub}</div></div>`).join('');
+    {lbl:'Shorts scannés (YouTube)',val:'—',sub:'5 catégories · en temps réel',icon:'▶️',col:'var(--red)',id:'metric-scanned'},
+    {lbl:'Vidéos en file',val:'—',sub:'en attente de publication',icon:'🏆',col:'var(--purple)',id:'metric-selected'},
+    {lbl:'Publiées aujourd\'hui',val:'—',sub:'10 comptes TikTok',icon:'📱',col:'var(--green)',id:'metric-published'},
+    {lbl:'Strikes actifs',val:'—',sub:'comptes suspendus',icon:'⚠️',col:'var(--green)',id:'metric-strikes'},
+  ].map(m=>`<div class="metric-card" style="border-top:3px solid ${m.col}"><div class="metric-glow" style="background:${m.col}"></div><div class="metric-icon">${m.icon}</div><div class="metric-lbl">${m.lbl}</div><div class="metric-val" id="${m.id}">${m.val}</div><div class="metric-sub">${m.sub}</div></div>`).join('');
+  renderCatStats();
+  addLog('success','ViralBot dashboard chargé');
+  addLog('info','Connexion aux données réelles en cours...');
+}
 
-  // Cat stats
-  document.getElementById('cat-stats').innerHTML=CATS.map(c=>{
+function renderCatStats(){
+  const el=document.getElementById('cat-stats');
+  if(!el)return;
+  el.innerHTML=CATS.map(c=>{
     const vids=VIDEOS.filter(v=>v.cat===c.id);
     const acc=ACCOUNTS.filter(a=>a.cat===c.id);
     return `<div class="cat-stat-card" onclick="go('top48',null);setCatFilter('${c.id}')" style="border-top:3px solid ${c.col}">
       <div class="cat-stat-icon">${c.icon}</div>
       <div class="cat-stat-name" style="color:${c.col}">${c.label}</div>
-      <div class="cat-stat-count">${vids.length*4}</div>
-      <div class="cat-stat-sub">${acc.length} compte${acc.length>1?'s':''} · ${vids.length} vidéos</div>
+      <div class="cat-stat-count">${vids.length}</div>
+      <div class="cat-stat-sub">${acc.length} compte${acc.length>1?'s':''} · ${vids.length} vidéos en file</div>
     </div>`;
   }).join('');
-
-  // Top performers
-  document.getElementById('top-performers').innerHTML=VIDEOS.slice(0,5).map(v=>{
-    const cat=getCat(v.cat);
-    return `<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border);cursor:pointer" onclick="openTT(${v.rank})">
-      <div style="width:44px;height:44px;border-radius:10px;background:${cat?.light||'var(--bg3)'};display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;position:relative">
-        ${v.emoji}
-        <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0);border-radius:10px;transition:background .2s" onmouseover="this.style.background='rgba(0,0,0,0.3)'" onmouseout="this.style.background='rgba(0,0,0,0)'"><span style="color:#fff;font-size:11px;opacity:0" onmouseover="this.style.opacity=1" onmouseout="this.style.opacity=0">▶</span></div>
-      </div>
-      <div style="flex:1;min-width:0">
-        <div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px">${v.title}</div>
-        <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-          ${catBadge(v.cat)}
-          <span class="badge ${v.mix==='recent'?'b-green':'b-gold'}" style="font-size:10px">${v.mix==='recent'?'🕐 Récente':'⭐ Evergreen'}</span>
-          <span style="font-size:11px;color:var(--text2)">⏱ ${v.dur}</span>
-        </div>
-      </div>
-      <div style="text-align:right;flex-shrink:0">
-        <div style="font-family:'DM Serif Display',serif;font-size:16px;color:${v.score>=90?'var(--green)':v.score>=75?'var(--yellow)':'var(--red)'}">${v.score}</div>
-        <div style="font-size:11px;color:var(--text2)">👁 ${v.views}</div>
-      </div>
-    </div>`;
-  }).join('');
-
-  addLog('success','ViralBot v0.6 démarré — Phase 1 YouTube');
-  addLog('success','5 catégories initialisées — scanning en cours');
-  addLog('info','Top 48 constitué : 24 récentes + 24 evergreen par catégorie');
-  addLog('info','10 comptes TikTok — 1 vidéo toutes les 20 min');
-  addLog('success','Anti-rediffusion actif — base de données vidéos publiées initialisée');
 }
 
 function addLog(type,msg){
@@ -648,35 +622,18 @@ function clearLog(){actLogs=[];document.getElementById('activity-log').innerHTML
 
 // ===== PIPELINE =====
 function initPipeline(){
-  renderPipe(['done','done','done','done','done','done','active','pending']);
+  renderPipe(['pending','pending','pending','pending','pending','pending','pending','pending']);
+  document.getElementById('pipe-metrics').innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:10px">Chargement des statistiques réelles…</div>';
+  document.getElementById('pipe-log').innerHTML = '<div style="color:var(--text3)">En attente des logs réels (chargés depuis Railway)…</div>';
+}
+
+function renderPipeMetrics(stats){
   document.getElementById('pipe-metrics').innerHTML=[
-    ['▶️ Shorts scannés (YouTube)','21 560 vidéos',100,'p-purple'],
-    ['🗂️ Triés par catégorie','5 catégories',100,'p-cyan'],
-    ['🕐 Récentes sélectionnées','24 × 5 = 120',100,'p-green'],
-    ['⭐ Evergreen sélectionnées','24 × 5 = 120',100,'p-yellow'],
-    ['🛡️ Filtrage copyright','1 247 rejetées',15,'p-red'],
-    ['🔍 Déduplication','312 doublons',4,'p-pink'],
-    ['✨ Édition IA','240/240 traitées',100,'p-purple'],
-    ['📱 Diffusion TikTok','En cours…',62,'p-green'],
-  ].map(([l,v,p,c])=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">${l}</span><span style="font-weight:700">${v}</span></div><div class="pbar-wrap"><div class="pbar ${c}" style="width:${p}%"></div></div></div>`).join('');
-  pipeLines=[
-    '[00:00:00] > ViralBot v0.6 démarré — Phase 1 YouTube',
-    '[00:00:01] > Scanning YouTube Shorts — Movies/Series...',
-    '[00:00:02] > Scanning YouTube Shorts — Streamer/Youtubeur...',
-    '[00:00:03] > Scanning YouTube Shorts — Sports...',
-    '[00:00:04] > Scanning YouTube Shorts — Divertissement...',
-    '[00:00:05] > Scanning YouTube Shorts — Others...',
-    '[00:00:06] > Total scanné : 21 560 vidéos',
-    '[00:00:07] > Sélection 24 récentes (24h) × 5 catégories',
-    '[00:00:08] > Sélection 24 evergreen (6 ans) × 5 catégories',
-    '[00:00:09] > Filtrage copyright : 1 247 rejetées',
-    '[00:00:10] > Déduplication : 312 doublons supprimés',
-    '[00:00:11] > Critère durée 60-90s appliqué',
-    '[00:00:12] > Édition IA : 240/240 vidéos traitées',
-    '[00:00:13] > Vérification anti-rediffusion : OK',
-    '[00:00:14] > Diffusion TikTok en cours…',
-  ];
-  document.getElementById('pipe-log').innerHTML=pipeLines.map(l=>`<div>${l}</div>`).join('');
+    ['▶️ Shorts scannés (YouTube)', (stats.totalScanned||0).toLocaleString('fr-FR')],
+    ['📋 Vidéos en file', (stats.totalSelected||0).toLocaleString('fr-FR')],
+    ['📱 Publiées aujourd\'hui', (stats.publishedToday||0).toLocaleString('fr-FR')],
+    ['⚠️ Strikes actifs', stats.activeStrikes||0],
+  ].map(([l,v])=>`<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:12px"><span style="color:var(--text2)">${l}</span><span style="font-weight:700;font-size:14px">${v}</span></div>`).join('');
 }
 
 function renderPipe(states){
@@ -689,21 +646,30 @@ async function runPipeline(){
   document.getElementById('pipe-btn').textContent='⏳ En cours...';
   document.getElementById('pipe-btn').disabled=true;
   document.getElementById('pipe-status').style.display='flex';
-  document.getElementById('pipe-status').innerHTML='<div class="spinner"></div>Pipeline en cours...';
-  for(let i=0;i<8;i++){
-    renderPipe([...Array(8)].map((_,j)=>j<i?'done':j===i?'active':'pending'));
-    const t=new Date().toLocaleTimeString('fr-FR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
-    pipeLines.push(`[${t}] > Étape ${i+1}/8 exécutée`);
-    document.getElementById('pipe-log').innerHTML=pipeLines.slice(-15).map(l=>`<div>${l}</div>`).join('');
-    document.getElementById('pipe-log').scrollTop=9999;
-    await new Promise(r=>setTimeout(r,800));
+  document.getElementById('pipe-status').innerHTML='<div class="spinner"></div>Scan en cours sur Railway...';
+  renderPipe(['active','active','active','active','active','active','active','active']);
+  try {
+    const r = await fetch('/api/scan', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
+    const d = await r.json();
+    if (d && d.success) {
+      renderPipe(['done','done','done','done','done','done','done','done']);
+      document.getElementById('pipe-status').innerHTML='<span style="color:var(--green);font-weight:600">✅ Scan lancé — résultats réels dans quelques minutes</span>';
+      notify('Scan lancé sur Railway','success');
+      addLog('success','Scan démarré sur Railway');
+    } else {
+      renderPipe(['pending','pending','pending','pending','pending','pending','pending','pending']);
+      document.getElementById('pipe-status').innerHTML='<span style="color:var(--red);font-weight:600">⚠️ Serveur non joignable</span>';
+      notify('Serveur non joignable','warn');
+    }
+  } catch(e) {
+    renderPipe(['pending','pending','pending','pending','pending','pending','pending','pending']);
+    document.getElementById('pipe-status').innerHTML='<span style="color:var(--red);font-weight:600">⚠️ Erreur réseau</span>';
+    notify('Erreur réseau','warn');
   }
-  renderPipe(['done','done','done','done','done','done','done','done']);
-  document.getElementById('pipe-status').innerHTML='<span style="color:var(--green);font-weight:600">✅ Cycle terminé — 240 vidéos prêtes à diffuser !</span>';
-  notify('Pipeline terminé — 240 vidéos prêtes !','success');
-  addLog('success','Pipeline complet — 5 catégories × 48 vidéos traitées');
   document.getElementById('pipe-btn').textContent='▶ Lancer un cycle';
   document.getElementById('pipe-btn').disabled=false;
+  // The scan itself runs async server-side; pull fresh real numbers a bit later
+  setTimeout(function(){ syncStatus(); loadRealLogs(); }, 8000);
 }
 
 // ===== CATEGORIES DETAIL =====
@@ -791,12 +757,8 @@ function renderVideos(){
         </div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0">
-        <div style="width:40px;height:40px;border-radius:50%;background:${v.score>=90?'var(--green-l)':v.score>=75?'var(--yellow-l)':'var(--red-l)'};border:2px solid ${v.score>=90?'var(--green)':v.score>=75?'var(--yellow)':'var(--red)'};display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:14px;color:${v.score>=90?'var(--green)':v.score>=75?'var(--yellow)':'var(--red)'}">${v.score}</div>
+        <div style="width:40px;height:40px;border-radius:50%;background:${v.score>=90?'var(--green-l)':v.score>=75?'var(--yellow-l)':v.score?'var(--red-l)':'var(--bg3)'};border:2px solid ${v.score>=90?'var(--green)':v.score>=75?'var(--yellow)':v.score?'var(--red)':'var(--border)'};display:flex;align-items:center;justify-content:center;font-family:'DM Serif Display',serif;font-size:14px;color:${v.score>=90?'var(--green)':v.score>=75?'var(--yellow)':v.score?'var(--red)':'var(--text3)'}">${v.score||'—'}</div>
         <div style="font-size:10px;color:var(--text3)">score</div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:center;gap:3px;flex-shrink:0">
-        <span class="badge ${v.safe>=95?'b-green':v.safe>=90?'b-yellow':'b-red'}">${v.safe}%</span>
-        <div style="font-size:10px;color:var(--text3)">sécurité</div>
       </div>
     </div>`;
   }).join('');
@@ -805,9 +767,9 @@ function renderVideos(){
 // ===== FILTRES =====
 function initFilters(){
   const mods=[['🎵','Musique copyright','Détection audio — empreinte acoustique'],['⚠️','Contenu violent','IA visuelle — sang, armes, accidents'],['🚫','Logos & marques','Nike, Apple, Disney... auto-écartés'],['🔞','Contenu adulte','Filtre IA — rejet automatique'],['📋','Blacklist chaînes','Chaînes bloquées après 1er rejet'],['🔍','Déduplication','Empreinte frame-by-frame inter-catégories'],['⏱️','Durée hors 60-90s','Rejet automatique si hors critères'],['🔁','Anti-rediffusion','Base de données des vidéos déjà publiées']];
-  document.getElementById('filter-mods').innerHTML=mods.map(([i,n,d])=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:19px;flex-shrink:0">${i}</span><div style="flex:1"><div style="font-size:13px;font-weight:600">${n}</div><div style="font-size:11px;color:var(--text2)">${d}</div></div><div class="toggle on" onclick="this.classList.toggle('on')"></div></div>`).join('');
-  document.getElementById('filter-stats').innerHTML=[['🎵 Musique copyright','1 247','58','p-red'],['⚠️ Violence','412','19','p-yellow'],['🚫 Logos','289','13','p-orange'],['🔞 Adulte','156','7','p-pink'],['🔍 Doublons','312','15','p-green'],['⏱️ Durée hors critères','198','9','p-cyan'],['🔁 Déjà publiées','1 820','85','p-purple']].map(([l,v,p,c])=>`<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2)">${l}</span><span style="font-weight:700">${v}</span></div><div class="pbar-wrap"><div class="pbar ${c}" style="width:${p}%"></div></div></div>`).join('');
-  document.getElementById('blacklist').innerHTML=['Universal Music (47 rejets)','Warner Bros. YouTube (31)','@fights_brutal (22)','Disney Official (18)'].map(b=>`<div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--red-l);border-radius:var(--r);margin-bottom:6px;border:1px solid rgba(220,38,38,0.1);font-size:12px"><span style="font-weight:500">${b.split(' (')[0]}</span><span class="badge b-red">${b.split('(')[1]&&'('+b.split('(')[1]}</span></div>`).join('');
+  document.getElementById('filter-mods').innerHTML='<div style="font-size:11px;color:var(--text3);margin-bottom:10px">⚠️ Roadmap — aucun de ces filtres n\'est branché à une vraie détection IA pour l\'instant. La durée 60-90s et l\'anti-rediffusion (déjà publiées) sont les seuls réellement appliqués par le serveur.</div>' + mods.map(([i,n,d])=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:19px;flex-shrink:0">${i}</span><div style="flex:1"><div style="font-size:13px;font-weight:600">${n}</div><div style="font-size:11px;color:var(--text2)">${d}</div></div></div>`).join('');
+  document.getElementById('filter-stats').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">Pas de suivi réel des rejets par catégorie pour l\'instant — ces filtres ne sont pas encore implémentés côté serveur.</div>';
+  document.getElementById('blacklist').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">Aucune blacklist de chaînes implémentée côté serveur pour l\'instant.</div>';
 }
 
 // ===== AI EDITION =====
@@ -881,7 +843,7 @@ function renderAccounts(){
         </div>
       </div>
 
-      ${a.status==='warn'?`<button class="btn btn-danger btn-sm" style="width:100%;margin-top:10px" onclick="notify('Compte suspendu. File en pause.','warn')">⚠️ Gérer le strike</button>`:''}
+      ${a.status==='warn'?`<button class="btn btn-danger btn-sm" style="width:100%;margin-top:10px" onclick="resumeAccount('${a.handle}')">⚠️ Reprendre ce compte</button>`:''}
       ${a.status==='pending'?`<button class="btn btn-primary btn-sm" style="width:100%;margin-top:10px" onclick="connectTikTok(a.handle)">🔗 Connecter TikTok</button>`:''}
     </div>`;
   }).join('');
@@ -971,30 +933,41 @@ async function publishNow(id){
 
 // ===== STRIKES =====
 function initStrikes(){
-  document.getElementById('strikes-proto').innerHTML=[
-    ['Détection automatique','Vérification toutes les 15 min via l\'API TikTok'],
-    ['Suspension immédiate','Compte touché mis en pause — les autres continuent'],
-    ['File d\'attente pausée','Vidéos en attente — jamais redistribuées sur un autre compte'],
-    ['Alerte immédiate','Notification : strike, vidéo concernée, catégorie, raison'],
-    ['Reprise manuelle','Tu valides depuis ce dashboard — la file repart automatiquement'],
-  ].map(([t,d],i)=>`<div class="step-item"><div class="step-num">${i+1}.</div><div><div style="font-weight:700;font-size:13px;margin-bottom:3px">${t}</div><div style="font-size:12px;color:var(--text2)">${d}</div></div></div>`).join('');
+  const struck = ACCOUNTS.filter(a=>a.status==='warn');
+  const noteHtml = `<div class="step-item"><div><div style="font-weight:700;font-size:13px;margin-bottom:3px">Comment ça marche réellement</div><div style="font-size:12px;color:var(--text2)">Un compte passe en "strike" dès que TikTok refuse une publication avec une erreur 403 (compte suspendu, ou restriction de l'app). La file de ce compte reste en pause tant qu'il n'est pas repris manuellement ci-dessous — les autres comptes continuent normalement.</div></div></div>`;
+  if (!struck.length) {
+    document.getElementById('strikes-proto').innerHTML = noteHtml + `<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">✅ Aucun compte en strike actuellement</div>`;
+    return;
+  }
+  document.getElementById('strikes-proto').innerHTML = noteHtml + struck.map(a=>`
+    <div class="step-item">
+      <div style="flex:1">
+        <div style="font-weight:700;font-size:13px;margin-bottom:3px">${a.handle}</div>
+        <div style="font-size:12px;color:var(--text2)">File en pause — dernière erreur 403 reçue de TikTok</div>
+      </div>
+      <button class="btn btn-danger btn-sm" onclick="resumeAccount('${a.handle}')">Reprendre</button>
+    </div>`).join('');
 }
 
 // ===== CONFIG =====
 function initConfig(){
+  const tiktokConnected = ACCOUNTS.filter(a=>a.connected).length;
+  const ytWorking = !!lastScanSeen;
   document.getElementById('apis-list').innerHTML=[
-    {n:'YouTube Data API v3',i:'▶️',s:'ok',d:'Clé API configurée — scanning actif',col:'var(--green)'},
-    {n:'TikTok Content Posting API',i:'🎵',s:'ok',d:'API approuvée ✅ — connexion comptes OAuth',col:'var(--green)'},
-    {n:'Instagram Graph API',i:'📸',s:'later',d:'Phase 3 — non démarré',col:'var(--text3)'},
-    {n:'Twitch API Helix',i:'🎮',s:'later',d:'Phase 3 — non démarré',col:'var(--text3)'},
-    {n:'Kick API',i:'🟢',s:'later',d:'Phase 3 — non démarré',col:'var(--text3)'},
-    {n:'Cloudflare R2',i:'☁️',s:'ok',d:'Bucket viral-videos configuré ✓',col:'var(--green)'},
-  ].map(a=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:19px">${a.i}</span><div style="flex:1"><div style="font-size:13px;font-weight:600">${a.n}</div><div style="font-size:11px;color:var(--text2)">${a.d}</div></div><span class="badge ${a.s==='ok'?'b-green':a.s==='missing'?'b-yellow':'b-gray'}">${a.s==='ok'?'✅ Connectée':a.s==='missing'?'⚠️ À configurer':'⏳ Plus tard'}</span></div>`).join('');
+    {n:'YouTube Data API v3',i:'▶️',ok:ytWorking,d:ytWorking?'Dernier scan reçu — voir l\'onglet Pipeline pour la date exacte':'Aucun scan reçu pour l\'instant'},
+    {n:'TikTok Content Posting API',i:'🎵',ok:tiktokConnected>0,d:tiktokConnected+' / '+ACCOUNTS.length+' comptes connectés (token OAuth actif)'},
+    {n:'Cloudflare R2',i:'☁️',ok:null,d:'Bucket configuré — pas de vérification en direct depuis ce tableau de bord'},
+    {n:'Instagram Graph API',i:'📸',ok:null,later:true,d:'Phase 3 — non démarré'},
+    {n:'Twitch API Helix',i:'🎮',ok:null,later:true,d:'Phase 3 — non démarré'},
+    {n:'Kick API',i:'🟢',ok:null,later:true,d:'Phase 3 — non démarré'},
+  ].map(a=>{
+    const badge = a.later ? {c:'b-gray',t:'⏳ Plus tard'} : a.ok===true ? {c:'b-green',t:'✅ Actif'} : a.ok===false ? {c:'b-yellow',t:'⚠️ À vérifier'} : {c:'b-gray',t:'ℹ️ Non vérifiable ici'};
+    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:19px">${a.i}</span><div style="flex:1"><div style="font-size:13px;font-weight:600">${a.n}</div><div style="font-size:11px;color:var(--text2)">${a.d}</div></div><span class="badge ${badge.c}">${badge.t}</span></div>`;
+  }).join('');
   document.getElementById('config-params').innerHTML=`
-    <div class="alert alert-yt" style="margin-bottom:14px"><span>▶️</span><span><strong>Phase 1 — YouTube uniquement</strong><br>Clé API : AIzaSyDIQS...q4s8RAE ✅</span></div>
-    ${[['Durée minimum (sec)','60'],['Durée maximum (sec)','90'],['Vidéos par catégorie','48'],['Récentes (24h) par catégorie','24'],['Evergreen (6 ans) par cat.','24'],['Intervalle entre posts (min)','20'],['Délai aléatoire (sec)','0-120'],['Heure de début diffusion','06:00'],['Heure de fin diffusion','22:00']].map(([l,v])=>`<div class="form-grp"><label class="form-label">${l}</label><input type="text" value="${v}"></div>`).join('')}
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--bg3);border-radius:var(--r);border:1px solid var(--border);margin-bottom:14px"><div><div style="font-size:13px;font-weight:600">Segmentation par thématique</div><div style="font-size:11px;color:var(--text2);margin-top:2px">✅ Activé — 5 catégories configurées</div></div><div class="toggle on"></div></div>
-    <button class="btn btn-primary" style="width:100%" onclick="notify('✅ Paramètres sauvegardés !','success')">💾 Sauvegarder</button>`;
+    <div class="alert alert-yt" style="margin-bottom:14px"><span>ℹ️</span><span><strong>Configuration actuelle (lecture seule)</strong><br>Ces valeurs sont définies dans le code du serveur. Les modifier ici ne change rien tant qu'une vraie page de paramètres n'est pas branchée au backend.</span></div>
+    ${[['Durée minimum (sec)','60'],['Durée maximum (sec)','90'],['Vidéos par catégorie / jour','48'],['Intervalle entre posts (min)','20'],['Heure de début diffusion','06:00'],['Heure de fin diffusion','22:00']].map(([l,v])=>`<div class="form-grp"><label class="form-label">${l}</label><input type="text" value="${v}" disabled style="opacity:.65;cursor:not-allowed"></div>`).join('')}
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--bg3);border-radius:var(--r);border:1px solid var(--border)"><div><div style="font-size:13px;font-weight:600">Segmentation par thématique</div><div style="font-size:11px;color:var(--text2);margin-top:2px">5 catégories configurées dans le code</div></div></div>`;
 }
 
 // ===== TT VIEWER =====
@@ -1030,14 +1003,14 @@ function renderTT(){
   document.getElementById('tt-likes').textContent=v.shares;
   document.getElementById('tt-comments').textContent=v.comments;
   document.getElementById('tt-shares').textContent=v.views;
-  const accs=['@viral_fr_1','@viral_fr_2','@viral_fr_3','@viral_fr_4','@viral_fr_5'];
-  document.getElementById('tt-account').textContent=accs[Math.floor(Math.random()*accs.length)];
+  const matchingAccs=ACCOUNTS.filter(a=>a.cat===v.cat);
+  document.getElementById('tt-account').textContent=matchingAccs.length?matchingAccs[0].handle+(matchingAccs.length>1?' (+'+(matchingAccs.length-1)+')':''):'Aucun compte assigné à cette catégorie';
   document.getElementById('tt-meta-rows').innerHTML=[
     ['Rang','#'+v.rank],
     ['Catégorie',(cat?.icon||'?')+' '+(cat?.label||'?')],
     ['Type',v.mix==='recent'?'🕐 Récente (24h)':'⭐ Evergreen (6 ans)'],
     ['Vues',v.views],['Partages',v.shares],['Commentaires',v.comments],
-    ['Durée',v.dur],['Score',v.score+'/100'],['Sécurité',v.safe+'%'],['Langue',v.lang],
+    ['Durée',v.dur],['Score',v.score?v.score+'/100':'—'],['Langue',v.lang],
   ].map(([k,val])=>`<div class="tt-meta-row"><span style="color:var(--text2);font-size:12px">${k}</span><span style="font-weight:700;font-size:12px">${val}</span></div>`).join('');
   const bar=document.getElementById('tt-bar');
   bar.style.animation='none';bar.offsetHeight;bar.style.animation='';
@@ -1056,7 +1029,7 @@ function notify(msg,type='info'){
   setTimeout(()=>{n.style.opacity='0';n.style.transition='opacity .3s';setTimeout(()=>n.remove(),300);},3500);
 }
 function simulateScan(){
-  scanned+=Math.floor(Math.random()*500+200);
+  // Overridden below by a patch that calls the real /api/scan endpoint.
   addLog('info','Scan YouTube manuel déclenché — 5 catégories');
   notify('⟳ Scan YouTube lancé — 5 catégories','info');
 }
@@ -1128,7 +1101,6 @@ function deleteAccount(handle) {
     loadRealVideos();
     loadRealLogs();
     loadTopPerformers();
-    loadTopPerformers();
       } else {
         notify('Erreur suppression', 'err');
       }
@@ -1175,13 +1147,13 @@ function closeAddModal() {
 }
 
 function saveCatToServer(handle, catId) {
-  fetch('/api/accounts/' + encodeURIComponent(handle) + '/category', {
+  return fetch('/api/accounts/' + encodeURIComponent(handle) + '/category', {
     method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ category: catId })
   })
-    .then(function() { addLog('success', 'Categorie sauvegardee sur le serveur'); })
-    .catch(function() { addLog('warn', 'Sauvegarde locale uniquement'); });
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return true; })
+    .catch(function() { return false; });
 }
 
 function loadRealAccounts() {
@@ -1210,6 +1182,9 @@ function loadRealAccounts() {
       });
       addLog('success', data.length + ' compte(s) charge(s) depuis Railway');
       renderAccounts();
+      if (document.getElementById('cat-stats')) renderCatStats();
+      if (document.getElementById('cat-detail-grid')) renderCatDetail();
+      if (document.getElementById('strikes-proto')) initStrikes();
     })
     .catch(function() {
       addLog('warn', 'Impossible de charger les comptes — verifier Railway');
@@ -1222,6 +1197,15 @@ function syncStatus() {
     .then(function(r) { return r.json(); })
     .then(function(d) {
       if (ind) { ind.textContent = '🟢 Connecte'; ind.style.color = 'var(--green)'; }
+      if (d && d.stats) {
+        var s = d.stats;
+        var setVal = function(id, val) { var el = document.getElementById(id); if (el) el.textContent = val; };
+        setVal('metric-scanned', (s.totalScanned||0).toLocaleString('fr-FR'));
+        setVal('metric-selected', (s.totalSelected||0).toLocaleString('fr-FR'));
+        setVal('metric-published', (s.publishedToday||0).toLocaleString('fr-FR'));
+        setVal('metric-strikes', s.activeStrikes||0);
+        if (document.getElementById('pipe-metrics')) renderPipeMetrics(s);
+      }
       if (d && d.recentLogs) {
         d.recentLogs.slice(0,2).forEach(function(l) {
           addLog('info', 'Scan ' + l.category + ' : ' + l.videos_selected + ' videos');
@@ -1256,12 +1240,42 @@ simulateScan = async function() {
   }
 };
 
-// Patch assignCat to also save to server
+function resumeAccount(handle) {
+  fetch('/api/accounts/' + encodeURIComponent(handle) + '/status', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status: 'active' })
+  })
+    .then(function(r) { if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
+    .then(function() {
+      notify(handle + ' repris — file relancée', 'success');
+      addLog('success', 'Compte repris : ' + handle);
+      loadRealAccounts();
+      if (document.getElementById('strikes-proto')) initStrikes();
+    })
+    .catch(function() {
+      notify('Échec de la reprise — réessaie', 'warn');
+    });
+}
+
+// Patch assignCat to also save to server, with a visible revert if the save fails
 var _origAssignCat = assignCat;
 assignCat = function(accId, catId) {
-  _origAssignCat(accId, catId);
   var acc = ACCOUNTS.find(function(a) { return a.id === accId; });
-  if (acc) saveCatToServer(acc.handle, catId);
+  var oldCat = acc ? acc.cat : undefined;
+  _origAssignCat(accId, catId);
+  if (acc) {
+    saveCatToServer(acc.handle, catId).then(function(ok) {
+      if (ok) {
+        addLog('success', 'Categorie sauvegardee sur le serveur');
+      } else {
+        acc.cat = oldCat;
+        renderAccounts();
+        notify('Échec de la sauvegarde — catégorie non enregistrée, réessaie', 'warn');
+        addLog('warn', 'Echec de sauvegarde pour ' + acc.handle + ' — categorie annulee');
+      }
+    });
+  }
 };
 
 // Patch renderAccounts to add real buttons
@@ -1311,28 +1325,39 @@ window.addEventListener('load', function() {
   });
 
   // Init Railway connection
-  setTimeout(function() {
-    addLog('info', 'Connexion au serveur Railway...');
-    fetch('/api/system')
-      .then(function(r) { return r.json(); })
-      .then(function(info) {
-        var sub = document.getElementById('sys-sub');
-        if (sub) sub.textContent = info.phase || 'Phase 1 — YouTube';
-        addLog('success', 'Serveur actif — ' + Math.floor((info.uptime||0)/60) + ' min uptime');
-        if (info.lastScan) addLog('info', 'Dernier scan : ' + new Date(info.lastScan).toLocaleString('fr-FR'));
-      })
-      .catch(function() {
-        addLog('warn', 'Serveur non joignable');
-      });
-    syncStatus();
-    loadRealAccounts();
-  }, 1000);
+  addLog('info', 'Connexion au serveur Railway...');
+  fetch('/api/system')
+    .then(function(r) { return r.json(); })
+    .then(function(info) {
+      var sub = document.getElementById('sys-sub');
+      if (sub) sub.textContent = info.phase || 'Phase 1 — YouTube';
+      addLog('success', 'Serveur actif — ' + Math.floor((info.uptime||0)/60) + ' min uptime');
+      if (info.lastScan) { lastScanSeen = info.lastScan; addLog('info', 'Dernier scan : ' + new Date(info.lastScan).toLocaleString('fr-FR')); }
+    })
+    .catch(function() {
+      addLog('warn', 'Serveur non joignable');
+    });
+  syncStatus();
+  loadRealAccounts();
+  loadRealVideos();
+  loadRealLogs();
+  loadTopPerformers();
 
   setInterval(syncStatus, 30000);
+  setInterval(loadRealAccounts, 30000);
 });
 
 
 // ===== REAL DATA FROM RAILWAY =====
+function deriveScore(views) {
+  if (!views) return null;
+  if (views >= 1000000) return 96;
+  if (views >= 500000) return 92;
+  if (views >= 100000) return 85;
+  if (views >= 10000) return 75;
+  return 60;
+}
+
 function loadRealVideos() {
   fetch(RAILWAY_URL + '/api/videos')
     .then(function(r) { return r.json(); })
@@ -1348,8 +1373,7 @@ function loadRealVideos() {
           views: item.views ? item.views.toLocaleString() : '—',
           shares: '—',
           comments: item.comments ? item.comments.toLocaleString() : '—',
-          score: item.score || 85,
-          safe: 95,
+          score: deriveScore(item.views),
           lang: item.lang || 'EN',
           emoji: emojis[item.category] || '📦',
           dur: item.duration ? item.duration + 's' : '60-90s',
@@ -1359,6 +1383,7 @@ function loadRealVideos() {
       });
       addLog('success', data.length + ' vidéos chargées depuis Railway');
       if(document.getElementById('vid-list')) renderVideos();
+      if(document.getElementById('cat-stats')) renderCatStats();
     }).catch(function() { addLog('warn', 'Impossible de charger les vidéos'); });
 }
 
