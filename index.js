@@ -262,7 +262,7 @@ app.post('/api/scan', async (req, res) => {
 
 app.get('/api/queue', async (req, res) => {
   try {
-    res.json(await dbHelpers.all('SELECT * FROM video_queue ORDER BY scheduled_at ASC LIMIT 100'));
+    res.json(await dbHelpers.all("SELECT * FROM video_queue WHERE status = 'pending' ORDER BY scheduled_at ASC LIMIT 100"));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }

@@ -11,6 +11,26 @@ const CATEGORY_CONTEXT = {
   others: 'Contenu viral inclassable, inventions, talents cachés',
 };
 
+async function callClaudeWithRetry(prompt, maxAttempts = 2) {
+  let lastErr;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await client.messages.create({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 800,
+        messages: [{ role: 'user', content: prompt }],
+      });
+    } catch (err) {
+      lastErr = err;
+      if (attempt < maxAttempts) {
+        logger.warn(`AI Editor call failed on attempt ${attempt} (${err.message}) — retrying in 2s`);
+        await new Promise(r => setTimeout(r, 2000));
+      }
+    }
+  }
+  throw lastErr;
+}
+
 async function generateContent(video, category, language = 'auto') {
   try {
     const lang = language === 'auto' ? (video.lang || 'FR') : language.toUpperCase();
@@ -34,11 +54,7 @@ IMPORTANT: Réponds UNIQUEMENT avec le JSON brut, SANS backticks, SANS markdown,
   "langue": "${lang}"
 }`;
 
-    const response = await client.messages.create({
-      model: 'claude-sonnet-4-6',
-      max_tokens: 800,
-      messages: [{ role: 'user', content: prompt }],
-    });
+    const response = await callClaudeWithRetry(prompt);
 
     let text = response.content.map(c => c.text || '').join('').trim();
     // Strip markdown backticks if Claude adds them despite instructions
