@@ -243,15 +243,21 @@ app.get('/callback', async (req, res) => {
 });
 
 app.post('/api/scan', async (req, res) => {
-  res.json({ success: true, message: 'Scan lance' });
-  try {
-    const results = await scanAllCategories();
-    const { buildDailyQueue } = require('./scheduler');
-    await buildDailyQueue(results);
-    logger.info('Scan complete');
-  } catch (err) {
-    logger.error('Scan error: ' + err.message);
+  const { runGuardedScan, isScanInProgress, buildDailyQueue } = require('./scheduler');
+  if (isScanInProgress()) {
+    res.json({ success: false, alreadyRunning: true, message: 'Un scan est deja en cours' });
+    return;
   }
+  res.json({ success: true, message: 'Scan lance' });
+  await runGuardedScan(async () => {
+    try {
+      const results = await scanAllCategories();
+      await buildDailyQueue(results);
+      logger.info('Scan complete');
+    } catch (err) {
+      logger.error('Scan error: ' + err.message);
+    }
+  });
 });
 
 app.get('/api/queue', async (req, res) => {
@@ -386,8 +392,9 @@ async function start() {
       initScheduler();
       // Only scan if not already done today — avoids wasting YouTube quota on restarts
       setTimeout(async () => {
+        const { isQuotaAvailable, markQuotaExhausted, runGuardedScan } = require('./scheduler');
+        await runGuardedScan(async () => {
         try {
-          const { isQuotaAvailable, markQuotaExhausted } = require('./scheduler');
           const lastScan = await dbHelpers.getStat('last_scan');
           if (isWithinCurrentQuotaWindow(lastScan)) {
             logger.info('Initial scan skipped — a scan already ran in the current quota window (last: ' + lastScan + ')');
@@ -419,6 +426,7 @@ async function start() {
         } catch (err) {
           logger.error('Initial scan error: ' + err.message);
         }
+        });
       }, 5000);
     });
   } catch (err) {

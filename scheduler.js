@@ -342,25 +342,32 @@ async function processQueueInner() {
   }
 }
 
+// Shared lock across ALL scan-triggering paths — both cron jobs below, the
+// manual /api/scan route (Pipeline "Lancer un cycle" / Dashboard "Scanner
+// YouTube" buttons), and the startup initial-scan in index.js. Previously this
+// lock was local to initScheduler() so only the two crons shared it; the
+// manual route had no lock at all. A click while a cron-triggered scan was
+// running (or two quick clicks) launched two concurrent scans, doubling
+// YouTube quota usage and AI generation calls — seen directly in production
+// logs (two "Starting full YouTube scan" lines 9 seconds apart).
+let isScanning = false;
+async function runGuardedScan(scanFn) {
+  if (isScanning) {
+    logger.info('Scan skipped — another scan is already in progress');
+    return { skipped: true };
+  }
+  isScanning = true;
+  try {
+    await scanFn();
+    return { skipped: false };
+  } finally {
+    isScanning = false;
+  }
+}
+function isScanInProgress() { return isScanning; }
+
 // Initialize all cron jobs
 function initScheduler() {
-  // Shared lock: the daily-scan cron below (08:15 UTC) falls inside the range of
-  // the every-5-minutes queue cron (6-21), so both could try to trigger a scan in
-  // the same tick right after the quota window opens. This lock makes sure only
-  // one scan runs at a time regardless of which cron triggered it.
-  let isScanning = false;
-  async function runGuardedScan(scanFn) {
-    if (isScanning) {
-      logger.info('Scan skipped — another scan is already in progress');
-      return;
-    }
-    isScanning = true;
-    try {
-      await scanFn();
-    } finally {
-      isScanning = false;
-    }
-  }
 
   // FIX (solution 6): the daily scan used to fire at 05:00 UTC, which is BEFORE
   // the real YouTube quota reset (07:00 UTC in summer / 08:00 UTC in winter — see
@@ -483,4 +490,4 @@ function initScheduler() {
   logger.info('✅ Scheduler initialized — all cron jobs active');
 }
 
-module.exports = { initScheduler, buildDailyQueue, scanAllCategories, isQuotaAvailable, markQuotaExhausted, publishQueueItem };
+module.exports = { initScheduler, buildDailyQueue, scanAllCategories, isQuotaAvailable, markQuotaExhausted, publishQueueItem, runGuardedScan, isScanInProgress };

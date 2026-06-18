@@ -342,7 +342,7 @@ select option{background:var(--bg2)}
     <div class="topbar-right">
       <span class="clock" id="clock"></span>
       <span id="api-status">🔄 Connexion...</span>
-      <button class="btn btn-sm" onclick="simulateScan()">⟳ Scanner YouTube</button>
+      <button class="btn btn-sm" id="scan-btn" onclick="simulateScan()">⟳ Scanner YouTube</button>
       <button class="btn btn-primary btn-sm" onclick="go('edition',null)">✨ Édition IA</button>
     </div>
   </div>
@@ -654,7 +654,11 @@ async function runPipeline(){
   try {
     const r = await fetch('/api/scan', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
     const d = await r.json();
-    if (d && d.success) {
+    if (d && d.alreadyRunning) {
+      renderPipe(['pending','pending','pending','pending','pending','pending','pending','pending']);
+      document.getElementById('pipe-status').innerHTML='<span style="color:var(--yellow);font-weight:600">⏳ Un scan est déjà en cours — patiente un peu</span>';
+      notify('Un scan est déjà en cours','warn');
+    } else if (d && d.success) {
       renderPipe(['done','done','done','done','done','done','done','done']);
       document.getElementById('pipe-status').innerHTML='<span style="color:var(--green);font-weight:600">✅ Scan lancé — résultats réels dans quelques minutes</span>';
       notify('Scan lancé sur Railway','success');
@@ -1243,6 +1247,9 @@ function syncStatus() {
 // Patch simulateScan to call real Railway API
 var _origScan = simulateScan;
 simulateScan = async function() {
+  var btn = document.getElementById('scan-btn');
+  if (btn && btn.disabled) return; // Ignore clicks while a scan is already in flight
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Scan en cours...'; }
   notify('Scan YouTube lance sur Railway...', 'info');
   addLog('info', 'Scan manuel declenche');
   try {
@@ -1252,7 +1259,10 @@ simulateScan = async function() {
       body: '{}'
     });
     var d = await r.json();
-    if (d && d.success) {
+    if (d && d.alreadyRunning) {
+      notify('Un scan est deja en cours — patiente un peu', 'warn');
+      addLog('warn', 'Scan ignore — un autre est deja en cours');
+    } else if (d && d.success) {
       notify('Scan lance ! Resultats dans quelques minutes.', 'success');
       addLog('success', 'Scan YouTube demarre sur Railway');
     } else {
@@ -1261,6 +1271,12 @@ simulateScan = async function() {
   } catch(e) {
     notify('Erreur reseau', 'warn');
   }
+  // Re-enable after a delay — the scan itself runs in the background on the
+  // server and can take a few minutes, but the button only needs to stay
+  // disabled long enough to prevent an accidental immediate double-click.
+  setTimeout(function() {
+    if (btn) { btn.disabled = false; btn.textContent = '⟳ Scanner YouTube'; }
+  }, 15000);
 };
 
 function resumeAccount(handle) {
