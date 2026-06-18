@@ -148,6 +148,15 @@ app.get('/api/stats', async (req, res) => {
   }
 });
 
+app.get('/api/blacklist', async (req, res) => {
+  try {
+    const channels = await dbHelpers.getBlacklistedChannels();
+    res.json(channels);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/accounts', async (req, res) => {
   try {
     const accounts = await dbHelpers.all('SELECT * FROM accounts');

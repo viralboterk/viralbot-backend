@@ -774,14 +774,24 @@ function initFilters(){
     ['⚠️','Contenu violent','IA visuelle — sang, armes, accidents',false],
     ['🚫','Logos & marques','Nike, Apple, Disney... auto-écartés',false],
     ['🔞','Contenu adulte','Filtre IA — rejet automatique',false],
-    ['📋','Blacklist chaînes','Chaînes bloquées après 1er rejet',false],
+    ['📋','Blacklist chaînes','Chaîne bloquée dès qu\'elle échoue 1 fois le filtre copyright ci-dessus',true],
     ['🔍','Déduplication','Même vidéo + même catégorie jamais stockée deux fois (contrainte base de données) — pas de comparaison visuelle inter-catégories',true],
     ['⏱️','Durée hors 60-90s','Rejet automatique si hors critères',true],
     ['🔁','Anti-rediffusion','Base de données des vidéos déjà publiées',true],
   ];
   document.getElementById('filter-mods').innerHTML = mods.map(([i,n,d,real])=>`<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:19px;flex-shrink:0">${i}</span><div style="flex:1"><div style="font-size:13px;font-weight:600">${n}</div><div style="font-size:11px;color:var(--text2)">${d}</div></div><span class="badge ${real?'b-green':'b-gray'}" style="flex-shrink:0">${real?'✅ Réel':'🔜 Prévu'}</span></div>`).join('');
   document.getElementById('filter-stats').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">Pas de suivi des rejets par catégorie pour les filtres IA marqués "Prévu" — ils ne sont pas encore implémentés côté serveur.</div>';
-  document.getElementById('blacklist').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">Aucune blacklist de chaînes implémentée côté serveur pour l\'instant.</div>';
+  document.getElementById('blacklist').innerHTML='<div style="text-align:center;padding:14px;color:var(--text3);font-size:12px">Chargement…</div>';
+  fetch('/api/blacklist')
+    .then(function(r){ return r.json(); })
+    .then(function(rows){
+      const el=document.getElementById('blacklist');
+      if(!rows||!rows.length){ el.innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">Aucune chaîne bloquée pour l\'instant.</div>'; return; }
+      el.innerHTML=rows.map(function(r){
+        return '<div style="display:flex;justify-content:space-between;padding:7px 10px;background:var(--red-l);border-radius:var(--r);margin-bottom:6px;border:1px solid rgba(220,38,38,0.1);font-size:12px"><span style="font-weight:500">'+r.channel+'</span><span class="badge b-red">'+r.rejected_count+' rejet'+(r.rejected_count>1?'s':'')+'</span></div>';
+      }).join('');
+    })
+    .catch(function(){ document.getElementById('blacklist').innerHTML='<div style="text-align:center;padding:20px;color:var(--text3);font-size:12px">Impossible de charger la blacklist.</div>'; });
 }
 
 // ===== AI EDITION =====

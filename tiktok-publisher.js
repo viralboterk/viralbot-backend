@@ -105,11 +105,18 @@ async function publishVideo(account, videoData) {
 
   } catch (err) {
     const tiktokError = err.response && err.response.data;
+    const tiktokErrorCode = tiktokError && tiktokError.error && tiktokError.error.code;
     logger.error('TikTok publish error for ' + account.handle + ': ' + err.message + (tiktokError ? ' | TikTok response: ' + JSON.stringify(tiktokError) : ' | no response body'));
     if (err.response && err.response.status === 401) {
       dbHelpers.updateAccount(account.handle, { status: 'token_expired' });
     }
     if (err.response && err.response.status === 403) {
+      if (tiktokErrorCode === 'spam_risk_too_many_posts') {
+        // Temporary daily rate limit — NOT a permanent strike.
+        // Caller will reschedule this account's remaining items for tomorrow.
+        return { success: false, spam_risk: true, error: tiktokErrorCode };
+      }
+      // Any other 403 (unaudited, suspended, etc.) is a real strike.
       dbHelpers.updateAccount(account.handle, { status: 'strike' });
     }
     return { success: false, error: err.message };

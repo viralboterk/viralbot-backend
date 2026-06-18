@@ -123,6 +123,14 @@ async function initDb() {
         value TEXT,
         updated_at TIMESTAMPTZ DEFAULT NOW()
       );
+
+      CREATE TABLE IF NOT EXISTS channel_blacklist (
+        channel TEXT PRIMARY KEY,
+        reason TEXT,
+        rejected_count INTEGER DEFAULT 1,
+        first_rejected_at TIMESTAMPTZ DEFAULT NOW(),
+        last_rejected_at TIMESTAMPTZ DEFAULT NOW()
+      );
     `);
     logger.info('PostgreSQL database initialized');
   } finally {
@@ -272,6 +280,29 @@ const dbHelpers = {
       publishedToday: publishedToday ? parseInt(publishedToday.cnt) : 0,
       activeStrikes: strikes ? parseInt(strikes.cnt) : 0,
     };
+  },
+
+  // ── CHANNEL BLACKLIST ─────────────────────────────────────
+  isChannelBlacklisted: async (channel) => {
+    if (!channel) return false;
+    const row = await get('SELECT channel FROM channel_blacklist WHERE channel = $1', [channel]);
+    return !!row;
+  },
+
+  recordChannelRejection: async (channel, reason) => {
+    if (!channel) return;
+    await run(
+      `INSERT INTO channel_blacklist (channel, reason, rejected_count, first_rejected_at, last_rejected_at)
+       VALUES ($1, $2, 1, NOW(), NOW())
+       ON CONFLICT (channel) DO UPDATE SET
+         rejected_count = channel_blacklist.rejected_count + 1,
+         last_rejected_at = NOW()`,
+      [channel, reason]
+    );
+  },
+
+  getBlacklistedChannels: async () => {
+    return all('SELECT * FROM channel_blacklist ORDER BY last_rejected_at DESC');
   },
 
   // ── RAW ACCESS ────────────────────────────────────────────

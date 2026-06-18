@@ -155,6 +155,19 @@ function copyrightSafetyCheck(video) {
   return true;
 }
 
+// Real, persistent channel blacklist: any channel that fails the copyright
+// heuristic once is recorded, and every future video from that channel is
+// auto-rejected without needing to re-evaluate title/channel keywords.
+async function passesContentFilters(video) {
+  if (!filterByDuration(video)) return false;
+  const blacklisted = await dbHelpers.isChannelBlacklisted(video.channelTitle);
+  if (blacklisted) return false;
+  if (!copyrightSafetyCheck(video)) {
+    await dbHelpers.recordChannelRejection(video.channelTitle, 'copyright_heuristic');
+    return false;
+  }
+  return true;
+}
 // Main scan function for one category
 async function scanCategory(category, type = 'both') {
   if (!YOUTUBE_API_KEY) {
@@ -199,10 +212,12 @@ async function scanCategory(category, type = 'both') {
   }
 
   // Filter and sort
-  const filterAndSort = (videos) => {
+  const filterAndSort = async (videos) => {
     if (!Array.isArray(videos)) return [];
-    return videos
-      .filter(v => v && filterByDuration(v) && copyrightSafetyCheck(v))
+    const candidates = videos.filter(Boolean);
+    const checks = await Promise.all(candidates.map(v => passesContentFilters(v)));
+    return candidates
+      .filter((v, i) => checks[i])
       .sort((a, b) => b.score - a.score)
       .reduce((acc, v) => { // Deduplicate
         if (!acc.find(x => x.id === v.id)) acc.push(v);
@@ -210,8 +225,8 @@ async function scanCategory(category, type = 'both') {
       }, []);
   };
 
-  const recentFiltered = filterAndSort(results.recent).slice(0, 24);
-  const evergreenFiltered = filterAndSort(results.evergreen).slice(0, 24);
+  const recentFiltered = (await filterAndSort(results.recent)).slice(0, 24);
+  const evergreenFiltered = (await filterAndSort(results.evergreen)).slice(0, 24);
 
   const totalFound = results.recent.length + results.evergreen.length;
   const totalSelected = recentFiltered.length + evergreenFiltered.length;

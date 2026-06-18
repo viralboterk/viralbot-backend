@@ -13,6 +13,11 @@ function randomDelay() {
 }
 
 
+// Shared set to prevent duplicate R2 deletion timers for the same file
+// (multiple accounts publishing the same video_id would otherwise each
+// schedule their own setTimeout, causing the file to be deleted early).
+const pendingR2Deletions = new Set();
+
 // Refresh TikTok token if needed before publishing
 
 // Track quota exhaustion — persisted in DB to survive restarts.
@@ -84,10 +89,19 @@ async function buildDailyQueue(scanResults) {
 
     const recentVideos = Array.isArray(catVideos.recent) ? catVideos.recent : [];
     const evergreenVideos = Array.isArray(catVideos.evergreen) ? catVideos.evergreen : [];
+    // Deduplicate across recent + evergreen — the same video can appear in
+    // both arrays if it ranked in both search windows. Without this, it gets
+    // queued twice (different mixType, different AI title) and published twice
+    // to the same account, which is the anti-rediffusion bug seen in the logs.
+    const seenIds = new Set();
     const allVideos = [
       ...recentVideos.map(v => ({ ...v, mixType: 'recent' })),
       ...evergreenVideos.map(v => ({ ...v, mixType: 'evergreen' })),
-    ];
+    ].filter(v => {
+      if (seenIds.has(v.id)) return false;
+      seenIds.add(v.id);
+      return true;
+    });
 
     // Filter out already published
     // Check published status async before filtering
@@ -192,6 +206,16 @@ async function publishQueueItem(account, item) {
       return { success: false, reason: 'daily_limit_reached' };
     }
 
+    // Safety check: verify not already published even if queued twice (second
+    // line of defence after buildDailyQueue deduplication, e.g. for manual
+    // "Publier maintenant" calls or race conditions).
+    const alreadyPublished = await dbHelpers.isPublished(item.video_id, account.handle);
+    if (alreadyPublished) {
+      logger.warn('Video ' + item.video_id + ' already published to ' + account.handle + ' — skipping duplicate queue item');
+      await dbHelpers.markQueueDone(item.id, 'skipped');
+      return { success: false, reason: 'already_published' };
+    }
+
     // Step 1: Download YouTube video and upload to R2 (with 4min timeout)
     logger.info('Downloading video ' + item.video_id + ' for ' + account.handle);
     let r2Url = null;
@@ -209,6 +233,16 @@ async function publishQueueItem(account, item) {
     if (!r2Url) {
       logger.error('Could not get R2 URL for ' + item.video_id + ' — skipping');
       await dbHelpers.markQueueDone(item.id, 'failed');
+      // Also fail all other pending items for this video_id across all accounts —
+      // if Cobalt can't download it once (with retry), it won't download it for
+      // any other account either (age-restricted, geo-blocked, etc.).
+      const otherItems = await dbHelpers.all(
+        "UPDATE video_queue SET status = 'failed' WHERE video_id = $1 AND status = 'pending' AND id != $2 RETURNING id",
+        [item.video_id, item.id]
+      );
+      if (otherItems.length > 0) {
+        logger.warn('Cobalt permanently failed for ' + item.video_id + ' — marked ' + otherItems.length + ' other pending item(s) as failed');
+      }
       return { success: false, reason: 'download_failed' };
     }
 
@@ -225,11 +259,30 @@ async function publishQueueItem(account, item) {
     if (result.success) {
       await dbHelpers.markPublished(item.video_id, account.handle, item.category, item.title);
       await dbHelpers.markQueueDone(item.id, 'published');
-      // Clean up R2 after successful publish
+      // Clean up R2 after successful publish.
+      // TikTok pulls asynchronously after PUBLISH_COMPLETE — 30 min gives it enough time.
+      // pendingR2Deletions prevents duplicate timers when multiple accounts share same video_id.
       const r2Key = 'videos/' + item.category + '/' + item.video_id + '.mp4';
-      setTimeout(() => deleteFromR2(r2Key), 60000); // Delete after 1 min
+      if (!pendingR2Deletions.has(r2Key)) {
+        pendingR2Deletions.add(r2Key);
+        setTimeout(() => {
+          deleteFromR2(r2Key);
+          pendingR2Deletions.delete(r2Key);
+        }, 30 * 60 * 1000);
+      }
       logger.info('✅ Published: ' + item.title + ' → ' + account.handle);
       return { success: true, publishId: result.publishId };
+    } else if (result.spam_risk) {
+      // spam_risk_too_many_posts is a temporary daily rate limit, NOT a permanent strike.
+      // Reschedule all remaining items for this account to 24h from now.
+      logger.warn('spam_risk on ' + account.handle + ' — rescheduling remaining queue to tomorrow');
+      await dbHelpers.run(
+        "UPDATE video_queue SET scheduled_at = NOW() + INTERVAL '24 hours' WHERE account_id = $1 AND status = 'pending'",
+        [account.handle]
+      );
+      await dbHelpers.markQueueDone(item.id, 'failed');
+      logger.error('❌ Failed (spam_risk — rescheduled to tomorrow): ' + item.title + ' → ' + account.handle);
+      return { success: false, reason: 'spam_risk' };
     } else {
       await dbHelpers.markQueueDone(item.id, 'failed');
       logger.error('❌ Failed: ' + item.title + ' → ' + account.handle);
@@ -254,14 +307,37 @@ async function processQueueInner() {
   for (let account of accounts) {
     const queue = await dbHelpers.getPendingQueue(account.handle);
     const dueItems = queue.filter(item => new Date(item.scheduled_at) <= now);
+    if (!dueItems.length) continue;
 
-    for (const item of dueItems.slice(0, 2)) { // Max 2 per cycle per account
-      try {
-        await publishQueueItem(account, item);
-      } catch (err) {
-        logger.error(`Queue processing error: ${err.message}`);
-        await dbHelpers.markQueueDone(item.id, 'error');
+    // Burst prevention: if an item is more than 1 hour overdue (catch-up scenario
+    // after a restart or long quota wait), reschedule it to 20 min from now instead
+    // of processing all overdue items at once. This prevents a burst of rapid
+    // back-to-back publications that triggers TikTok's spam_risk_too_many_posts.
+    const ONE_HOUR = 60 * 60 * 1000;
+    let rescheduled = 0;
+    for (const item of dueItems) {
+      const overdue = now - new Date(item.scheduled_at);
+      if (overdue > ONE_HOUR) {
+        const newTime = new Date(now.getTime() + (20 + rescheduled * 20) * 60 * 1000);
+        await dbHelpers.run('UPDATE video_queue SET scheduled_at = $1 WHERE id = $2', [newTime.toISOString(), item.id]);
+        rescheduled++;
       }
+    }
+    if (rescheduled > 0) {
+      logger.info(account.handle + ': rescheduled ' + rescheduled + ' overdue item(s) to prevent burst');
+      continue; // Don't publish this cycle — let the rescheduled items run on time
+    }
+
+    // Max 1 item per account per cycle (not 2) to respect TikTok's rate limits
+    const item = dueItems[0];
+    try {
+      const result = await publishQueueItem(account, item);
+      // Stop processing this account's queue for the rest of this cycle
+      // if it hit spam_risk — remaining items already rescheduled to tomorrow.
+      if (result && result.reason === 'spam_risk') continue;
+    } catch (err) {
+      logger.error(`Queue processing error: ${err.message}`);
+      await dbHelpers.markQueueDone(item.id, 'error');
     }
   }
 }
