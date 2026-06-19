@@ -518,10 +518,17 @@ function initScheduler() {
       const pendingRows = await dbHelpers.all("SELECT COUNT(*) as cnt FROM video_queue WHERE status = 'pending'");
       const pendingCount = pendingRows[0];
       if (pendingCount && parseInt(pendingCount.cnt) === 0) {
-        // Check if we scanned in the last 30 minutes to avoid infinite loop
+        // A full scan costs ~4,300 of the 10,000 daily quota units (43%!) — the
+        // budget realistically affords only ~2 full scans per day. A 30-min
+        // cooldown allowed up to 32 auto-scan attempts in the 06:00-22:00 window,
+        // which reliably exhausted quota hours before the actual midnight-Pacific
+        // reset (observed: quota exceeded earlier and earlier each day). 3 hours
+        // caps this to ~5 attempts/day, which in practice still means the budget
+        // runs out after 1-2 of them succeed, but never wastes the cooldown on
+        // attempts that have no chance of finding any quota left.
         const lastScan = await dbHelpers.getStat('last_auto_scan');
-        const thirtyMinAgo = new Date(Date.now() - 30 * 60 * 1000);
-        if (!lastScan || new Date(lastScan) < thirtyMinAgo) {
+        const cooldownAgo = new Date(Date.now() - 3 * 60 * 60 * 1000);
+        if (!lastScan || new Date(lastScan) < cooldownAgo) {
           await runGuardedScan(async () => {
             logger.info('Queue empty — triggering automatic scan');
             try {
