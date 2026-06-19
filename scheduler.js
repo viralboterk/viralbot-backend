@@ -577,7 +577,7 @@ function initScheduler() {
   cron.schedule('0 4 * * *', async () => {
     logger.info('Refreshing TikTok tokens');
     try {
-      const { getAccountInfo } = require('./tiktok-publisher');
+      const { getAccountInfo, getTotalViews } = require('./tiktok-publisher');
       const accounts = await dbHelpers.getAllActiveAccounts();
       for (const account of accounts) {
         try {
@@ -585,13 +585,17 @@ function initScheduler() {
           if (info && typeof info.follower_count === 'number') {
             await dbHelpers.updateAccount(account.handle, { followers: info.follower_count });
           }
+          const totalViews = await getTotalViews(account.access_token);
+          if (totalViews !== null) {
+            await dbHelpers.updateAccount(account.handle, { total_views: totalViews });
+          }
         } catch (err) {
-          logger.warn('Could not refresh follower count for ' + account.handle + ': ' + err.message);
+          logger.warn('Could not refresh stats for ' + account.handle + ': ' + err.message);
         }
       }
-      logger.info('Follower counts refreshed for ' + accounts.length + ' account(s)');
+      logger.info('Account stats (followers + views) refreshed for ' + accounts.length + ' account(s)');
     } catch (err) {
-      logger.error('Follower count refresh error: ' + err.message);
+      logger.error('Account stats refresh error: ' + err.message);
     }
   });
 

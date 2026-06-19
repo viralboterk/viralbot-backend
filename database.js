@@ -72,6 +72,7 @@ async function initDb() {
       -- without hitting it brings it back down to the default.
       ALTER TABLE accounts ADD COLUMN IF NOT EXISTS post_interval_min INTEGER DEFAULT 20;
       ALTER TABLE accounts ADD COLUMN IF NOT EXISTS last_spam_risk_at TIMESTAMPTZ;
+      ALTER TABLE accounts ADD COLUMN IF NOT EXISTS total_views BIGINT DEFAULT 0;
 
       CREATE TABLE IF NOT EXISTS published_videos (
         id SERIAL PRIMARY KEY,
