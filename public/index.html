@@ -982,14 +982,37 @@ function initConfig(){
   document.getElementById('apis-list').innerHTML=[
     {n:'YouTube Data API v3',i:'▶️',ok:ytWorking,d:ytWorking?'Dernier scan reçu — voir l\'onglet Pipeline pour la date exacte':'Aucun scan reçu pour l\'instant'},
     {n:'TikTok Content Posting API',i:'🎵',ok:tiktokConnected>0,d:tiktokConnected+' / '+ACCOUNTS.length+' comptes connectés (token OAuth actif)'},
-    {n:'Cloudflare R2',i:'☁️',ok:null,d:'Bucket configuré — pas de vérification en direct depuis ce tableau de bord'},
+    {n:'Cloudflare R2',i:'☁️',ok:null,loading:true,id:'r2-status-row',d:'Vérification en cours…'},
     {n:'Instagram Graph API',i:'📸',ok:null,later:true,d:'Phase 3 — non démarré'},
     {n:'Twitch API Helix',i:'🎮',ok:null,later:true,d:'Phase 3 — non démarré'},
     {n:'Kick API',i:'🟢',ok:null,later:true,d:'Phase 3 — non démarré'},
   ].map(a=>{
-    const badge = a.later ? {c:'b-gray',t:'⏳ Plus tard'} : a.ok===true ? {c:'b-green',t:'✅ Actif'} : a.ok===false ? {c:'b-yellow',t:'⚠️ À vérifier'} : {c:'b-gray',t:'ℹ️ Non vérifiable ici'};
-    return `<div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:19px">${a.i}</span><div style="flex:1"><div style="font-size:13px;font-weight:600">${a.n}</div><div style="font-size:11px;color:var(--text2)">${a.d}</div></div><span class="badge ${badge.c}">${badge.t}</span></div>`;
+    const badge = a.loading ? {c:'b-gray',t:'⏳ Vérification…'} : a.later ? {c:'b-gray',t:'⏳ Plus tard'} : a.ok===true ? {c:'b-green',t:'✅ Actif'} : a.ok===false ? {c:'b-yellow',t:'⚠️ À vérifier'} : {c:'b-gray',t:'ℹ️ Non vérifiable ici'};
+    return `<div id="${a.id||''}" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:19px">${a.i}</span><div style="flex:1"><div style="font-size:13px;font-weight:600">${a.n}</div><div style="font-size:11px;color:var(--text2)" id="${a.id?a.id+'-desc':''}">${a.d}</div></div><span class="badge ${badge.c}" id="${a.id?a.id+'-badge':''}">${badge.t}</span></div>`;
   }).join('');
+  fetch('/api/r2-health')
+    .then(function(r){ return r.json(); })
+    .then(function(result){
+      const descEl = document.getElementById('r2-status-row-desc');
+      const badgeEl = document.getElementById('r2-status-row-badge');
+      if (!descEl || !badgeEl) return;
+      if (result.ok) {
+        descEl.textContent = 'Upload + lecture publique testés avec succès à l\'instant';
+        badgeEl.className = 'badge b-green';
+        badgeEl.textContent = '✅ Actif';
+      } else {
+        const stageLabel = {config:'configuration manquante', upload:'échec upload S3', public_access:'fichier uploadé mais inaccessible publiquement'}[result.stage] || 'échec';
+        descEl.textContent = 'Échec : ' + stageLabel + (result.error ? ' (' + result.error + ')' : '');
+        badgeEl.className = 'badge b-yellow';
+        badgeEl.textContent = '⚠️ À vérifier';
+      }
+    })
+    .catch(function(){
+      const descEl = document.getElementById('r2-status-row-desc');
+      const badgeEl = document.getElementById('r2-status-row-badge');
+      if (descEl) descEl.textContent = 'Impossible de joindre le serveur pour vérifier';
+      if (badgeEl) { badgeEl.className = 'badge b-yellow'; badgeEl.textContent = '⚠️ À vérifier'; }
+    });
   document.getElementById('config-params').innerHTML=`
     <div class="alert alert-yt" style="margin-bottom:14px"><span>ℹ️</span><span><strong>Configuration actuelle (lecture seule)</strong><br>Ces valeurs sont définies dans le code du serveur. Les modifier ici ne change rien tant qu'une vraie page de paramètres n'est pas branchée au backend.</span></div>
     ${[['Durée minimum (sec)','60'],['Durée maximum (sec)','90'],['Vidéos par catégorie / jour','48'],['Intervalle entre posts (min)','20'],['Heure de début diffusion','06:00'],['Heure de fin diffusion','22:00']].map(([l,v])=>`<div class="form-grp"><label class="form-label">${l}</label><input type="text" value="${v}" disabled style="opacity:.65;cursor:not-allowed"></div>`).join('')}
@@ -1201,7 +1224,7 @@ function loadRealAccounts() {
           pub: 0, max: 48, strikes: 0,
           status: acc.status === 'active' ? 'ok' : acc.status === 'strike' ? 'warn' : 'pending',
           age: acc.created_at ? new Date(acc.created_at).toLocaleDateString('fr-FR') : 'Nouveau',
-          followers: 0, views: '--',
+          followers: acc.followers || 0, views: '--',
           cat: acc.category || '',
           connected: !!acc.access_token,
         });

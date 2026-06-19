@@ -63,6 +63,10 @@ async function initDb() {
         daily_count INTEGER DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+      -- Migration: the production accounts table already existed before the
+      -- followers column was added, so CREATE TABLE IF NOT EXISTS alone won't
+      -- add it to existing rows.
+      ALTER TABLE accounts ADD COLUMN IF NOT EXISTS followers INTEGER DEFAULT 0;
 
       CREATE TABLE IF NOT EXISTS published_videos (
         id SERIAL PRIMARY KEY,
@@ -89,6 +93,7 @@ async function initDb() {
         published_at TIMESTAMPTZ,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
+      ALTER TABLE video_queue ADD COLUMN IF NOT EXISTS retry_count INTEGER DEFAULT 0;
 
       CREATE TABLE IF NOT EXISTS scan_log (
         id SERIAL PRIMARY KEY,

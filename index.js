@@ -157,6 +157,16 @@ app.get('/api/blacklist', async (req, res) => {
   }
 });
 
+app.get('/api/r2-health', async (req, res) => {
+  try {
+    const { checkR2Health } = require('./video-downloader');
+    const result = await checkR2Health();
+    res.json(result);
+  } catch (err) {
+    res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
 app.get('/api/accounts', async (req, res) => {
   try {
     const accounts = await dbHelpers.all('SELECT * FROM accounts');
@@ -236,6 +246,20 @@ app.get('/callback', async (req, res) => {
       [handle, tokenData.access_token, tokenData.refresh_token]
     );
     logger.info('TikTok account connected: ' + handle);
+    // Fetch follower count now that the connection includes user.info.stats.
+    // Best-effort: if this fails (e.g. an account reconnected before this
+    // scope existed and TikTok hasn't re-prompted consent), don't block the
+    // connection itself on it.
+    try {
+      const { getAccountInfo } = require('./tiktok-publisher');
+      const info = await getAccountInfo(tokenData.access_token);
+      if (info && typeof info.follower_count === 'number') {
+        await dbHelpers.updateAccount(handle, { followers: info.follower_count });
+        logger.info(handle + ': ' + info.follower_count + ' abonnes recuperes');
+      }
+    } catch (statsErr) {
+      logger.warn('Could not fetch follower count for ' + handle + ': ' + statsErr.message);
+    }
     res.send('<html><body style="font-family:sans-serif;text-align:center;padding:40px;background:#f7f5ff"><h1 style="color:#7c3aed">Compte connecte !</h1><p><strong>' + handle + '</strong> est maintenant lie a ViralBot.</p><p>Tu peux fermer cette fenetre.</p></body></html>');
   } catch (err) {
     res.send('<h2>Erreur : ' + err.message + '</h2>');

@@ -1,7 +1,17 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const https = require('https');
 const logger = require('./logger');
 
-const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
+// "Premature close" errors observed in production were happening on nearly
+// every call during busy scan windows. A likely cause is a pooled keep-alive
+// HTTP connection going stale (idle timeout on one side of the connection)
+// while a previous request still has it checked out. Disabling keep-alive
+// forces a fresh TCP connection per request, which trades a little latency
+// for much higher reliability under this specific failure pattern.
+const client = new Anthropic({
+  apiKey: process.env.ANTHROPIC_API_KEY,
+  httpAgent: new https.Agent({ keepAlive: false }),
+});
 
 const CATEGORY_CONTEXT = {
   movies: 'Films, séries, cinéma, scènes cultes',
@@ -11,7 +21,7 @@ const CATEGORY_CONTEXT = {
   others: 'Contenu viral inclassable, inventions, talents cachés',
 };
 
-async function callClaudeWithRetry(prompt, maxAttempts = 2) {
+async function callClaudeWithRetry(prompt, maxAttempts = 3) {
   let lastErr;
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     try {
@@ -23,8 +33,9 @@ async function callClaudeWithRetry(prompt, maxAttempts = 2) {
     } catch (err) {
       lastErr = err;
       if (attempt < maxAttempts) {
-        logger.warn(`AI Editor call failed on attempt ${attempt} (${err.message}) — retrying in 2s`);
-        await new Promise(r => setTimeout(r, 2000));
+        const delayMs = attempt * 2000; // 2s, then 4s
+        logger.warn(`AI Editor call failed on attempt ${attempt} (${err.message}) — retrying in ${delayMs/1000}s`);
+        await new Promise(r => setTimeout(r, delayMs));
       }
     }
   }
@@ -50,8 +61,7 @@ IMPORTANT: Réponds UNIQUEMENT avec le JSON brut, SANS backticks, SANS markdown,
   "titre": "titre TikTok catchy max 80 chars",
   "description": "2-3 phrases : qui, où, quoi — ton accrocheur adapté à ${catContext}",
   "hashtags": ["tag1","tag2","tag3","tag4","tag5","tag6","tag7","tag8","tag9","tag10","tag11","tag12","tag13","tag14","tag15","tag16","tag17","tag18","tag19","tag20"],
-  "hook": "accroche 2 premières secondes max 15 mots",
-  "langue": "${lang}"
+  "hook": "accroche 2 premières secondes max 15 mots"
 }`;
 
     const response = await callClaudeWithRetry(prompt);
@@ -68,7 +78,6 @@ IMPORTANT: Réponds UNIQUEMENT avec le JSON brut, SANS backticks, SANS markdown,
         description: video.title || 'Contenu viral incroyable !',
         hashtags: ['viral', 'fyp', 'foryou', 'trending', 'shorts', category],
         hook: 'Tu vas pas croire ca...',
-        langue: video.lang || 'FR',
       };
     }
     const json = JSON.parse(jsonMatch[0]);
@@ -83,7 +92,6 @@ IMPORTANT: Réponds UNIQUEMENT avec le JSON brut, SANS backticks, SANS markdown,
       description: video.description?.substring(0, 150) || 'Contenu viral incroyable !',
       hashtags: ['viral', 'fyp', 'foryou', 'trending', 'short', category],
       hook: 'Tu vas pas croire ce qui se passe ici...',
-      langue: video.lang || 'FR',
     };
   }
 }

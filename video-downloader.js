@@ -1,5 +1,5 @@
 const axios = require('axios');
-const { S3Client, PutObjectCommand } = require('@aws-sdk/client-s3');
+const { S3Client, PutObjectCommand, DeleteObjectCommand } = require('@aws-sdk/client-s3');
 const logger = require('./logger');
 
 // R2 Client
@@ -59,8 +59,12 @@ function extractCobaltResult(res, videoId, label) {
   return url;
 }
 
+function getCobaltErrorCode(e) {
+  return e.response && e.response.data && e.response.data.error && e.response.data.error.code;
+}
+
 // METHOD 1: Private Cobalt instance (self-hosted on Railway)
-async function tryCobaltPrivate(videoId) {
+async function tryCobaltPrivate(videoId, diag) {
   try {
     const res = await axios.post(COBALT_URL + '/', {
       url: 'https://www.youtube.com/watch?v=' + videoId,
@@ -84,12 +88,13 @@ async function tryCobaltPrivate(videoId) {
     const status = e.response ? e.response.status : 'no-status';
     const data = e.response ? JSON.stringify(e.response.data).substring(0, 150) : e.message;
     logger.error('Private Cobalt error for ' + videoId + ' [' + status + ']: ' + data);
+    if (diag && getCobaltErrorCode(e) === 'error.api.youtube.login') diag.youtubeLoginRequired = true;
     return null;
   }
 }
 
 // METHOD 2: Cobalt with different quality fallback
-async function tryCobaltFallback(videoId) {
+async function tryCobaltFallback(videoId, diag) {
   try {
     const res = await axios.post(COBALT_URL + '/', {
       url: 'https://www.youtube.com/watch?v=' + videoId,
@@ -113,12 +118,13 @@ async function tryCobaltFallback(videoId) {
     const status = e.response ? e.response.status : 'no-status';
     const data = e.response ? JSON.stringify(e.response.data).substring(0, 150) : e.message;
     logger.error('Private Cobalt fallback error for ' + videoId + ' [' + status + ']: ' + data);
+    if (diag && getCobaltErrorCode(e) === 'error.api.youtube.login') diag.youtubeLoginRequired = true;
     return null;
   }
 }
 
 // METHOD 3: Cobalt with youtu.be format
-async function tryCobaltShort(videoId) {
+async function tryCobaltShort(videoId, diag) {
   try {
     const res = await axios.post(COBALT_URL + '/', {
       url: 'https://youtu.be/' + videoId,
@@ -142,6 +148,7 @@ async function tryCobaltShort(videoId) {
     const status = e.response ? e.response.status : 'no-status';
     const data = e.response ? JSON.stringify(e.response.data).substring(0, 150) : e.message;
     logger.error('Private Cobalt short URL error for ' + videoId + ' [' + status + ']: ' + data);
+    if (diag && getCobaltErrorCode(e) === 'error.api.youtube.login') diag.youtubeLoginRequired = true;
     return null;
   }
 }
@@ -149,16 +156,16 @@ async function tryCobaltShort(videoId) {
 // Main: try all methods in order. Each call is a FRESH negotiation with Cobalt —
 // never reuse a URL obtained from a previous call, since these links are
 // short-lived / single-use (solution 10: freshness validation).
-async function getYouTubeDirectUrl(videoId) {
+async function getYouTubeDirectUrl(videoId, diag) {
   let url = null;
 
-  url = await tryCobaltPrivate(videoId);
+  url = await tryCobaltPrivate(videoId, diag);
   if (url) return url;
 
-  url = await tryCobaltFallback(videoId);
+  url = await tryCobaltFallback(videoId, diag);
   if (url) return url;
 
-  url = await tryCobaltShort(videoId);
+  url = await tryCobaltShort(videoId, diag);
   if (url) return url;
 
   logger.error('All download methods failed for ' + videoId);
@@ -171,8 +178,8 @@ async function getYouTubeUrlFallback(videoId) {
 
 // Fetches a direct URL and downloads it IMMEDIATELY (no delay) to minimize the
 // window in which a short-lived Cobalt link can expire (solution 7 + 10).
-async function fetchVideoBuffer(videoId) {
-  const directUrl = await getYouTubeDirectUrl(videoId);
+async function fetchVideoBuffer(videoId, diag) {
+  const directUrl = await getYouTubeDirectUrl(videoId, diag);
   if (!directUrl) return { buffer: null, reason: 'no-url' };
 
   const response = await axios.get(directUrl, {
@@ -192,8 +199,10 @@ async function fetchVideoBuffer(videoId) {
 async function downloadAndUploadToR2(videoId, category) {
   if (!R2_PUBLIC_URL) {
     logger.error('Aborting download for ' + videoId + ': R2_PUBLIC_URL is not configured.');
-    return null;
+    return { url: null, youtubeLoginRequired: false };
   }
+
+  const diag = { youtubeLoginRequired: false };
 
   try {
     const r2Key = 'videos/' + category + '/' + videoId + '.mp4';
@@ -203,7 +212,7 @@ async function downloadAndUploadToR2(videoId, category) {
 
     // First attempt
     try {
-      const result = await fetchVideoBuffer(videoId);
+      const result = await fetchVideoBuffer(videoId, diag);
       videoBuffer = result.buffer;
     } catch (downloadErr) {
       logger.error('Download attempt 1 failed for ' + videoId + ': ' + downloadErr.message);
@@ -220,7 +229,7 @@ async function downloadAndUploadToR2(videoId, category) {
           ' bytes — retrying once with a fresh Cobalt negotiation');
       }
       try {
-        const retryResult = await fetchVideoBuffer(videoId);
+        const retryResult = await fetchVideoBuffer(videoId, diag);
         videoBuffer = retryResult.buffer;
       } catch (retryErr) {
         logger.error('Download retry failed for ' + videoId + ': ' + retryErr.message);
@@ -230,7 +239,7 @@ async function downloadAndUploadToR2(videoId, category) {
     if (!videoBuffer || videoBuffer.length < 10000) {
       logger.error('Downloaded file too small for ' + videoId + ' after retry: ' +
         (videoBuffer ? videoBuffer.length : 0) + ' bytes');
-      return null;
+      return { url: null, youtubeLoginRequired: diag.youtubeLoginRequired };
     }
 
     logger.info('Downloaded ' + videoId + ': ' + (videoBuffer.length / 1024 / 1024).toFixed(1) + 'MB');
@@ -243,11 +252,11 @@ async function downloadAndUploadToR2(videoId, category) {
     }));
 
     logger.info('Video ' + videoId + ' uploaded to R2: ' + r2Key);
-    return R2_PUBLIC_URL + '/' + r2Key;
+    return { url: R2_PUBLIC_URL + '/' + r2Key, youtubeLoginRequired: false };
 
   } catch (err) {
     logger.error('downloadAndUploadToR2 error for ' + videoId + ': ' + err.message);
-    return null;
+    return { url: null, youtubeLoginRequired: diag.youtubeLoginRequired };
   }
 }
 
@@ -261,4 +270,45 @@ async function deleteFromR2(key) {
   }
 }
 
-module.exports = { downloadAndUploadToR2, getYouTubeDirectUrl, getYouTubeUrlFallback, deleteFromR2 };
+// Real R2 health check: uploads a tiny test file via the S3 API, then
+// verifies it's actually publicly reachable through R2_PUBLIC_URL — the
+// exact chain TikTok depends on when it pulls a video via PULL_FROM_URL.
+// Cleans up the test file regardless of outcome.
+async function checkR2Health() {
+  if (!R2_PUBLIC_URL) {
+    return { ok: false, stage: 'config', error: 'R2_PUBLIC_URL is not set' };
+  }
+  const testKey = 'healthcheck/' + Date.now() + '.txt';
+  try {
+    await s3.send(new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: testKey,
+      Body: 'viralbot-r2-healthcheck',
+      ContentType: 'text/plain',
+    }));
+  } catch (err) {
+    return { ok: false, stage: 'upload', error: err.message };
+  }
+
+  let publicOk = false;
+  let publicError = null;
+  try {
+    const url = R2_PUBLIC_URL + '/' + testKey;
+    const res = await axios.get(url, { timeout: 8000, validateStatus: () => true });
+    publicOk = res.status === 200;
+    if (!publicOk) publicError = 'HTTP ' + res.status;
+  } catch (err) {
+    publicError = err.message;
+  }
+
+  try {
+    await s3.send(new DeleteObjectCommand({ Bucket: BUCKET, Key: testKey }));
+  } catch (err) {
+    logger.warn('R2 healthcheck cleanup failed: ' + err.message);
+  }
+
+  if (!publicOk) return { ok: false, stage: 'public_access', error: publicError };
+  return { ok: true };
+}
+
+module.exports = { downloadAndUploadToR2, getYouTubeDirectUrl, getYouTubeUrlFallback, deleteFromR2, checkR2Health };

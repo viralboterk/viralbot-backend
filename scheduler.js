@@ -18,6 +18,25 @@ function randomDelay() {
 // schedule their own setTimeout, causing the file to be deleted early).
 const pendingR2Deletions = new Set();
 
+// Short-lived cache so that when multiple accounts in the same category share
+// a video_id, only the FIRST account actually downloads from YouTube and
+// uploads to R2 — every other account just reuses that R2 URL. 10 minutes is
+// comfortably longer than the time between same-category accounts being
+// processed in practice, and comfortably shorter than the 30-minute R2
+// deletion delay, so a cached URL is never returned for an already-deleted file.
+const recentR2Uploads = new Map();
+const UPLOAD_CACHE_TTL_MS = 10 * 60 * 1000;
+function getCachedR2Upload(videoId, category) {
+  const cached = recentR2Uploads.get(videoId + ':' + category);
+  if (cached && (Date.now() - cached.timestamp) < UPLOAD_CACHE_TTL_MS) {
+    return cached.r2Url;
+  }
+  return null;
+}
+function setCachedR2Upload(videoId, category, r2Url) {
+  recentR2Uploads.set(videoId + ':' + category, { r2Url, timestamp: Date.now() });
+}
+
 // Refresh TikTok token if needed before publishing
 
 // Track quota exhaustion — persisted in DB to survive restarts.
@@ -156,7 +175,7 @@ async function buildDailyQueue(scanResults) {
         category: account.category,
         mixType: video.mixType,
         title: aiContent.titre,
-        description: aiContent.description + '\n\n' + aiContent.hashtags.map(t => '#' + t).join(' '),
+        description: (aiContent.hook ? aiContent.hook + '\n\n' : '') + aiContent.description + '\n\n' + aiContent.hashtags.map(t => '#' + t).join(' '),
         tags: JSON.stringify(aiContent.hashtags),
         r2Url: null, // Will be filled during publish
         scheduledAt: scheduledAt.toISOString(),
@@ -217,21 +236,56 @@ async function publishQueueItem(account, item) {
     }
 
     // Step 1: Download YouTube video and upload to R2 (with 4min timeout)
-    logger.info('Downloading video ' + item.video_id + ' for ' + account.handle);
-    let r2Url = null;
-    // Budget: video-downloader.js tries up to 3 Cobalt negotiation methods
-    // (15s each) + 1 download (60s) per cycle = 105s worst case, and retries
-    // the whole cycle once on an empty result = up to 210s. 240s leaves a
-    // 30s margin above that worst case instead of cutting it off mid-retry.
-    try {
-      const downloadPromise = downloadAndUploadToR2(item.video_id, item.category);
-      const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Download timeout')), 240000));
-      r2Url = await Promise.race([downloadPromise, timeoutPromise]);
-    } catch(downloadErr) {
-      logger.error('Download error for ' + item.video_id + ': ' + downloadErr.message);
+    // — unless another account already uploaded this exact video+category
+    // moments ago, in which case reuse that R2 URL instead of re-downloading.
+    let r2Url = getCachedR2Upload(item.video_id, item.category);
+    let youtubeLoginRequired = false;
+    if (r2Url) {
+      logger.info('Reusing cached R2 upload for ' + item.video_id + ' (already uploaded for another account)');
+    } else {
+      logger.info('Downloading video ' + item.video_id + ' for ' + account.handle);
+      // Budget: video-downloader.js tries up to 3 Cobalt negotiation methods
+      // (15s each) + 1 download (60s) per cycle = 105s worst case, and retries
+      // the whole cycle once on an empty result = up to 210s. 240s leaves a
+      // 30s margin above that worst case instead of cutting it off mid-retry.
+      try {
+        const downloadPromise = downloadAndUploadToR2(item.video_id, item.category);
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Download timeout')), 240000));
+        const result = await Promise.race([downloadPromise, timeoutPromise]);
+        r2Url = result.url;
+        youtubeLoginRequired = result.youtubeLoginRequired;
+      } catch(downloadErr) {
+        logger.error('Download error for ' + item.video_id + ': ' + downloadErr.message);
+      }
+      if (r2Url) {
+        setCachedR2Upload(item.video_id, item.category, r2Url);
+      }
     }
     if (!r2Url) {
       logger.error('Could not get R2 URL for ' + item.video_id + ' — skipping');
+
+      // "error.api.youtube.login" means Cobalt has no authenticated YouTube
+      // session for a request YouTube is currently challenging — observed in
+      // production to be transient (the same video has succeeded on a later
+      // attempt a couple hours after failing this way). Reschedule rather than
+      // discard, but cap retries so a genuinely permanently-restricted video
+      // doesn't reschedule forever.
+      const MAX_TRANSIENT_RETRIES = 3;
+      if (youtubeLoginRequired && (item.retry_count || 0) < MAX_TRANSIENT_RETRIES) {
+        const RETRY_DELAY_MS = 90 * 60 * 1000;
+        const retryAt = new Date(Date.now() + RETRY_DELAY_MS).toISOString();
+        await dbHelpers.run(
+          'UPDATE video_queue SET scheduled_at = $1, retry_count = retry_count + 1 WHERE id = $2',
+          [retryAt, item.id]
+        );
+        const retried = await dbHelpers.all(
+          "UPDATE video_queue SET scheduled_at = $1, retry_count = retry_count + 1 WHERE video_id = $2 AND status = 'pending' AND id != $3 RETURNING id",
+          [retryAt, item.video_id, item.id]
+        );
+        logger.warn('YouTube auth required for ' + item.video_id + ' (attempt ' + ((item.retry_count || 0) + 1) + '/' + MAX_TRANSIENT_RETRIES + ') — rescheduled this item + ' + retried.length + ' other pending item(s) to retry in 90 min');
+        return { success: false, reason: 'youtube_login_required_retry_later' };
+      }
+
       await dbHelpers.markQueueDone(item.id, 'failed');
       // Also fail all other pending items for this video_id across all accounts —
       // if Cobalt can't download it once (with retry), it won't download it for
@@ -481,10 +535,27 @@ function initScheduler() {
     }
   });
 
-  // Token refresh daily at 04:00
+  // Token refresh daily at 04:00 — also refresh follower counts here since
+  // it already iterates all accounts at a low-traffic time of day.
   cron.schedule('0 4 * * *', async () => {
     logger.info('Refreshing TikTok tokens');
-    // Token refresh logic handled in tiktok-publisher
+    try {
+      const { getAccountInfo } = require('./tiktok-publisher');
+      const accounts = await dbHelpers.getAllActiveAccounts();
+      for (const account of accounts) {
+        try {
+          const info = await getAccountInfo(account.access_token);
+          if (info && typeof info.follower_count === 'number') {
+            await dbHelpers.updateAccount(account.handle, { followers: info.follower_count });
+          }
+        } catch (err) {
+          logger.warn('Could not refresh follower count for ' + account.handle + ': ' + err.message);
+        }
+      }
+      logger.info('Follower counts refreshed for ' + accounts.length + ' account(s)');
+    } catch (err) {
+      logger.error('Follower count refresh error: ' + err.message);
+    }
   });
 
   logger.info('✅ Scheduler initialized — all cron jobs active');
