@@ -184,7 +184,7 @@ async function scanCategory(category, type = 'both') {
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     for (const query of queries.slice(0, 3)) {
       try {
-        const ids = await searchShorts(query, 15, yesterday);
+        const ids = await searchShorts(query, 50, yesterday);
         const details = await getVideoDetails(ids);
         if (Array.isArray(details)) results.recent.push(...details);
       } catch (e) {
@@ -200,7 +200,7 @@ async function scanCategory(category, type = 'both') {
     const sixYearsAgo = new Date(Date.now() - 6 * 365 * 24 * 60 * 60 * 1000).toISOString();
     for (const query of queries.slice(3)) {
       try {
-        const ids = await searchShorts(query, 15, sixYearsAgo);
+        const ids = await searchShorts(query, 50, sixYearsAgo);
         const details = await getVideoDetails(ids);
         if (Array.isArray(details)) results.evergreen.push(...details);
       } catch (e) {

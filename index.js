@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const axios = require('axios');
 const path = require('path');
 const { initDb, dbHelpers } = require('./database');
 const { initScheduler } = require('./scheduler');
@@ -164,6 +165,37 @@ app.get('/api/r2-health', async (req, res) => {
     res.json(result);
   } catch (err) {
     res.status(500).json({ ok: false, error: err.message });
+  }
+});
+
+// Diagnostic: re-check TikTok's CURRENT status for a publish_id we already
+// have logged from a past publish attempt. Our own code only checks status
+// once, right after publishing (PUBLISH_COMPLETE) — it never re-checks
+// later. If TikTok removed the video afterwards (delayed moderation, content
+// match), this is the only way to find out, since our logs would still show
+// the original "success" forever.
+app.get('/api/diagnose-publish', async (req, res) => {
+  const { handle, publishId } = req.query;
+  if (!handle || !publishId) {
+    return res.status(400).json({ error: 'Usage: /api/diagnose-publish?handle=@xxx&publishId=v_pub_url~...' });
+  }
+  try {
+    const account = await dbHelpers.get('SELECT * FROM accounts WHERE handle = $1', [handle]);
+    if (!account || !account.access_token) {
+      return res.status(404).json({ error: 'Account not found or not connected: ' + handle });
+    }
+    const statusRes = await axios.post('https://open.tiktokapis.com/v2/post/publish/status/fetch/', {
+      publish_id: publishId,
+    }, {
+      headers: {
+        'Authorization': 'Bearer ' + account.access_token,
+        'Content-Type': 'application/json',
+      }
+    });
+    res.json({ handle, publishId, tiktokResponse: statusRes.data });
+  } catch (err) {
+    const tiktokError = err.response && err.response.data;
+    res.status(500).json({ error: err.message, tiktokResponse: tiktokError || null });
   }
 });
 
