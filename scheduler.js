@@ -106,6 +106,17 @@ async function buildDailyQueue(scanResults) {
     const catVideos = scanResults[account.category];
     if (!catVideos) continue;
 
+    // Adaptive pacing recovery: if this account hasn't hit spam_risk in 3+
+    // days, bring its posting interval back down to the default rather than
+    // leaving it permanently slowed down because of a one-time incident.
+    const THREE_DAYS_MS = 3 * 24 * 60 * 60 * 1000;
+    const isQuiet = !account.last_spam_risk_at || (Date.now() - new Date(account.last_spam_risk_at).getTime()) > THREE_DAYS_MS;
+    if (isQuiet && (account.post_interval_min || 20) > 20) {
+      await dbHelpers.updateAccount(account.handle, { post_interval_min: 20 });
+      logger.info(account.handle + ': posting interval reset to 20 min (no spam_risk in 3+ days)');
+      account.post_interval_min = 20;
+    }
+
     const recentVideos = Array.isArray(catVideos.recent) ? catVideos.recent : [];
     const evergreenVideos = Array.isArray(catVideos.evergreen) ? catVideos.evergreen : [];
     // Deduplicate across recent + evergreen — the same video can appear in
@@ -133,15 +144,17 @@ async function buildDailyQueue(scanResults) {
     const selected = newVideos.slice(0, 48);
     logger.info(`Account ${account.handle} [${account.category}]: ${selected.length} videos queued`);
 
-    // Schedule — 1 video every 20 minutes
+    // Schedule — 1 video every N minutes, where N adapts per account (see
+    // adaptive pacing above) instead of a fixed 20 min for every account.
     // Start from NOW or 06:00, whichever is later
+    const intervalMin = account.post_interval_min || 20;
     let scheduleTime = new Date();
     const startOfDay = new Date();
     startOfDay.setHours(6, 0, 0, 0);
     if (scheduleTime < startOfDay) scheduleTime = startOfDay;
-    // Round up to next 20-min slot
+    // Round up to next interval-aligned slot
     const minutes = scheduleTime.getMinutes();
-    const nextSlot = Math.ceil(minutes / 20) * 20;
+    const nextSlot = Math.ceil(minutes / intervalMin) * intervalMin;
     scheduleTime.setMinutes(nextSlot, 0, 0);
 
     for (let i = 0; i < selected.length; i++) {
@@ -181,7 +194,7 @@ async function buildDailyQueue(scanResults) {
         scheduledAt: scheduledAt.toISOString(),
       });
 
-      scheduleTime = new Date(scheduleTime.getTime() + 20 * 60 * 1000); // +20 min
+      scheduleTime = new Date(scheduleTime.getTime() + intervalMin * 60 * 1000);
       if (scheduleTime.getHours() >= 22) break; // Stop at 22:00
     }
   }
@@ -245,12 +258,13 @@ async function publishQueueItem(account, item) {
     } else {
       logger.info('Downloading video ' + item.video_id + ' for ' + account.handle);
       // Budget: video-downloader.js tries up to 3 Cobalt negotiation methods
-      // (15s each) + 1 download (60s) per cycle = 105s worst case, and retries
-      // the whole cycle once on an empty result = up to 210s. 240s leaves a
-      // 30s margin above that worst case instead of cutting it off mid-retry.
+      // (15s each) + 1 download (60s) per cycle = 105s worst case, and now
+      // retries the whole cycle up to 2 more times (3 total attempts) on an
+      // empty result = up to 315s. 360s leaves a margin above that worst case
+      // instead of cutting the 3rd attempt off mid-retry.
       try {
         const downloadPromise = downloadAndUploadToR2(item.video_id, item.category);
-        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Download timeout')), 240000));
+        const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject(new Error('Download timeout')), 360000));
         const result = await Promise.race([downloadPromise, timeoutPromise]);
         r2Url = result.url;
         youtubeLoginRequired = result.youtubeLoginRequired;
@@ -334,6 +348,20 @@ async function publishQueueItem(account, item) {
         "UPDATE video_queue SET scheduled_at = NOW() + INTERVAL '24 hours' WHERE account_id = $1 AND status = 'pending'",
         [account.handle]
       );
+      // Adaptive pacing: this account is hitting TikTok's real rate limit faster
+      // than our fixed 20-min cadence assumes. Widen its future interval (capped
+      // at 3h) instead of repeating the same cadence and hitting the same wall
+      // again tomorrow. recoverIntervalIfQuiet() brings it back down once the
+      // account goes a few days without hitting spam_risk again.
+      const MAX_INTERVAL_MIN = 180;
+      const currentInterval = account.post_interval_min || 20;
+      const newInterval = Math.min(Math.round(currentInterval * 1.5), MAX_INTERVAL_MIN);
+      if (newInterval !== currentInterval) {
+        await dbHelpers.updateAccount(account.handle, { post_interval_min: newInterval, last_spam_risk_at: new Date().toISOString() });
+        logger.warn('Backoff: ' + account.handle + ' posting interval widened ' + currentInterval + ' → ' + newInterval + ' min');
+      } else {
+        await dbHelpers.updateAccount(account.handle, { last_spam_risk_at: new Date().toISOString() });
+      }
       await dbHelpers.markQueueDone(item.id, 'failed');
       logger.error('❌ Failed (spam_risk — rescheduled to tomorrow): ' + item.title + ' → ' + account.handle);
       return { success: false, reason: 'spam_risk' };
@@ -364,15 +392,17 @@ async function processQueueInner() {
     if (!dueItems.length) continue;
 
     // Burst prevention: if an item is more than 1 hour overdue (catch-up scenario
-    // after a restart or long quota wait), reschedule it to 20 min from now instead
-    // of processing all overdue items at once. This prevents a burst of rapid
-    // back-to-back publications that triggers TikTok's spam_risk_too_many_posts.
+    // after a restart or long quota wait), reschedule it using this account's
+    // current interval instead of processing all overdue items at once. This
+    // prevents a burst of rapid back-to-back publications that triggers
+    // TikTok's spam_risk_too_many_posts.
     const ONE_HOUR = 60 * 60 * 1000;
+    const intervalMin = account.post_interval_min || 20;
     let rescheduled = 0;
     for (const item of dueItems) {
       const overdue = now - new Date(item.scheduled_at);
       if (overdue > ONE_HOUR) {
-        const newTime = new Date(now.getTime() + (20 + rescheduled * 20) * 60 * 1000);
+        const newTime = new Date(now.getTime() + (intervalMin + rescheduled * intervalMin) * 60 * 1000);
         await dbHelpers.run('UPDATE video_queue SET scheduled_at = $1 WHERE id = $2', [newTime.toISOString(), item.id]);
         rescheduled++;
       }

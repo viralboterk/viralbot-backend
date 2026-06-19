@@ -210,34 +210,30 @@ async function downloadAndUploadToR2(videoId, category) {
     logger.info('Downloading video ' + videoId + '...');
     let videoBuffer = null;
 
-    // First attempt
-    try {
-      const result = await fetchVideoBuffer(videoId, diag);
-      videoBuffer = result.buffer;
-    } catch (downloadErr) {
-      logger.error('Download attempt 1 failed for ' + videoId + ': ' + downloadErr.message);
-    }
-
-    // FIX (solutions 3 + 10): a 0-byte (or implausibly small) result usually means
-    // the link Cobalt handed us was already stale or single-use-consumed by the
-    // time we fetched it. Retrying with a fully fresh negotiation (not reusing the
-    // old URL) resolves this in many documented cases, so we try once more before
-    // giving up, instead of failing the video outright on the first empty result.
-    if (!videoBuffer || videoBuffer.length < 10000) {
-      if (videoBuffer) {
-        logger.warn('Downloaded file too small for ' + videoId + ': ' + videoBuffer.length +
-          ' bytes — retrying once with a fresh Cobalt negotiation');
-      }
+    // FIX (solutions 3 + 10, extended): a 0-byte (or implausibly small) result
+    // usually means the link Cobalt handed us was already stale, single-use-
+    // consumed, or served by a different Cobalt sub-instance than the one that
+    // negotiated it (if the instance is horizontally scaled without a shared
+    // tunnel cache). Retrying with a fully fresh negotiation resolves this in
+    // many documented cases, so we try up to 3 times before giving up, instead
+    // of failing the video outright after just one retry.
+    const MAX_ATTEMPTS = 3;
+    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
       try {
-        const retryResult = await fetchVideoBuffer(videoId, diag);
-        videoBuffer = retryResult.buffer;
-      } catch (retryErr) {
-        logger.error('Download retry failed for ' + videoId + ': ' + retryErr.message);
+        const result = await fetchVideoBuffer(videoId, diag);
+        videoBuffer = result.buffer;
+      } catch (err) {
+        logger.error('Download attempt ' + attempt + '/' + MAX_ATTEMPTS + ' failed for ' + videoId + ': ' + err.message);
+      }
+      if (videoBuffer && videoBuffer.length >= 10000) break;
+      if (attempt < MAX_ATTEMPTS) {
+        logger.warn('Downloaded file too small for ' + videoId + ': ' + (videoBuffer ? videoBuffer.length : 0) +
+          ' bytes — retrying (attempt ' + (attempt + 1) + '/' + MAX_ATTEMPTS + ') with a fresh Cobalt negotiation');
       }
     }
 
     if (!videoBuffer || videoBuffer.length < 10000) {
-      logger.error('Downloaded file too small for ' + videoId + ' after retry: ' +
+      logger.error('Downloaded file too small for ' + videoId + ' after ' + MAX_ATTEMPTS + ' attempts: ' +
         (videoBuffer ? videoBuffer.length : 0) + ' bytes');
       return { url: null, youtubeLoginRequired: diag.youtubeLoginRequired };
     }
