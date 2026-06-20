@@ -16,7 +16,7 @@ const PRIVACY_LEVEL = process.env.TIKTOK_PRIVACY_LEVEL || 'SELF_ONLY';
 function getOAuthUrl(accountHandle) {
   const appUrl = process.env.APP_URL || 'https://viralbot-backend-production.up.railway.app';
   const redirectUri = encodeURIComponent(appUrl + '/callback');
-  const scope = encodeURIComponent('video.upload,video.publish,user.info.basic,user.info.stats');
+  const scope = encodeURIComponent('video.upload,video.publish,user.info.basic');
   const state = encodeURIComponent(accountHandle);
   return 'https://www.tiktok.com/v2/auth/authorize/?client_key=' + CLIENT_KEY + '&scope=' + scope + '&response_type=code&redirect_uri=' + redirectUri + '&state=' + state;
 }
@@ -137,6 +137,39 @@ async function getAccountInfo(accessToken) {
   }
 }
 
+// Sum view_count across ALL of the account's videos via /v2/video/list/,
+// paginating with the cursor TikTok returns until has_more is false.
+// Capped at 20 pages (≤ 400 videos at max_count=20) as a safety net against
+// an unexpected infinite-pagination response — well above what any of these
+// accounts will realistically have.
+async function getTotalViews(accessToken) {
+  let totalViews = 0;
+  let cursor = 0;
+  let hasMore = true;
+  let pages = 0;
+  try {
+    while (hasMore && pages < 20) {
+      const res = await axios.post(
+        TIKTOK_API + '/video/list/?fields=id,view_count',
+        { max_count: 20, cursor },
+        { headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' } }
+      );
+      const data = res.data && res.data.data;
+      if (!data || !Array.isArray(data.videos)) break;
+      for (const v of data.videos) {
+        totalViews += v.view_count || 0;
+      }
+      hasMore = !!data.has_more;
+      cursor = data.cursor;
+      pages++;
+    }
+    return totalViews;
+  } catch (err) {
+    logger.error('TikTok get video list error: ' + err.message);
+    return null; // null = couldn't fetch, caller should leave the stored value untouched
+  }
+}
+
 function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
-module.exports = { getOAuthUrl, exchangeCodeForToken, refreshToken, publishVideo, getAccountInfo };
+module.exports = { getOAuthUrl, exchangeCodeForToken, refreshToken, publishVideo, getAccountInfo, getTotalViews };

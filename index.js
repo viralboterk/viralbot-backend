@@ -201,7 +201,19 @@ app.get('/api/diagnose-publish', async (req, res) => {
 
 app.get('/api/accounts', async (req, res) => {
   try {
-    const accounts = await dbHelpers.all('SELECT * FROM accounts');
+    const accounts = await dbHelpers.all(`
+      SELECT a.*,
+        COALESCE(p.published_total, 0) AS published_total,
+        COALESCE(p.published_today, 0) AS published_today
+      FROM accounts a
+      LEFT JOIN (
+        SELECT account_id,
+          COUNT(*) AS published_total,
+          COUNT(*) FILTER (WHERE published_at::date = CURRENT_DATE) AS published_today
+        FROM published_videos
+        GROUP BY account_id
+      ) p ON p.account_id = a.handle
+    `);
     res.json(accounts);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -283,14 +295,19 @@ app.get('/callback', async (req, res) => {
     // scope existed and TikTok hasn't re-prompted consent), don't block the
     // connection itself on it.
     try {
-      const { getAccountInfo } = require('./tiktok-publisher');
+      const { getAccountInfo, getTotalViews } = require('./tiktok-publisher');
       const info = await getAccountInfo(tokenData.access_token);
       if (info && typeof info.follower_count === 'number') {
         await dbHelpers.updateAccount(handle, { followers: info.follower_count });
         logger.info(handle + ': ' + info.follower_count + ' abonnes recuperes');
       }
+      const totalViews = await getTotalViews(tokenData.access_token);
+      if (totalViews !== null) {
+        await dbHelpers.updateAccount(handle, { total_views: totalViews });
+        logger.info(handle + ': ' + totalViews + ' vues totales recuperees');
+      }
     } catch (statsErr) {
-      logger.warn('Could not fetch follower count for ' + handle + ': ' + statsErr.message);
+      logger.warn('Could not fetch stats for ' + handle + ': ' + statsErr.message);
     }
     res.send('<html><body style="font-family:sans-serif;text-align:center;padding:40px;background:#f7f5ff"><h1 style="color:#7c3aed">Compte connecte !</h1><p><strong>' + handle + '</strong> est maintenant lie a ViralBot.</p><p>Tu peux fermer cette fenetre.</p></body></html>');
   } catch (err) {

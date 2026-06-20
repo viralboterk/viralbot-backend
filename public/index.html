@@ -857,8 +857,8 @@ function renderAccounts(){
         <div style="flex:1"><div class="acc-name">${a.name}</div><div class="acc-handle">${a.handle}</div></div>
         <span class="badge ${a.status==='ok'?'b-green':a.status==='warm'?'b-cyan':a.status==='warn'?'b-yellow':'b-gray'}" style="font-size:10px">${a.status==='ok'?'✅ En ligne':a.status==='warm'?'🔵 Warming':a.status==='warn'?'⚠️ Strike':'⏳ Attente'}</span>
       </div>
-      ${[['Publiées (24h)',a.pub+' / '+a.max],['Abonnés',a.followers>0?a.followers.toLocaleString():'—'],['Vues 7j',a.views],['Ancienneté',a.age]].map(([k,v])=>`<div class="acc-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('')}
-      <div style="margin-top:8px"><div class="pbar-wrap"><div class="pbar ${a.status==='warn'?'p-yellow':'p-green'}" style="width:${Math.round(a.pub/a.max*100)}%"></div></div></div>
+      ${[['Publiées (total)',a.pubTotal.toLocaleString('fr-FR')],['Publiées aujourd\'hui',a.pubToday],['Abonnés',a.followers>0?a.followers.toLocaleString():'—'],['Vues totales',a.views],['Ancienneté',a.age]].map(([k,v])=>`<div class="acc-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('')}
+      <div style="margin-top:8px"><div class="pbar-wrap"><div class="pbar ${a.status==='warn'?'p-yellow':'p-green'}" style="width:${Math.min(100,Math.round(a.pubToday/48*100))}%"></div></div><div style="font-size:10px;color:var(--text3);margin-top:3px">${a.pubToday} / 48 aujourd'hui</div></div>
 
       <!-- CATEGORY SELECTOR -->
       <div style="margin-top:12px;border-top:1px solid var(--border);padding-top:12px">
@@ -1221,10 +1221,10 @@ function loadRealAccounts() {
           name: acc.handle.replace('@',''),
           handle: acc.handle,
           col: colors[i % colors.length],
-          pub: 0, max: 48, strikes: 0,
+          pubTotal: acc.published_total || 0, pubToday: acc.published_today || 0, strikes: 0,
           status: acc.status === 'active' ? 'ok' : acc.status === 'strike' ? 'warn' : 'pending',
           age: acc.created_at ? new Date(acc.created_at).toLocaleDateString('fr-FR') : 'Nouveau',
-          followers: acc.followers || 0, views: '--',
+          followers: acc.followers || 0, views: acc.total_views ? acc.total_views.toLocaleString('fr-FR') : '—',
           cat: acc.category || '',
           connected: !!acc.access_token,
         });
