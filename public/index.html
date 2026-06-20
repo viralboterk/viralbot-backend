@@ -1427,7 +1427,16 @@ function loadRealVideos() {
       if (!data || !data.length) { addLog('info', 'File vide — lance un scan YouTube'); return; }
       VIDEOS.length = 0;
       var emojis = {movies:'🎬',stream:'🎮',sports:'⚽',divert:'🎉',others:'📦'};
-      data.slice(0,48).forEach(function(item, i) {
+      // Backend already balances per category, but take a per-category slice
+      // here too (rather than a flat overall cut) so no single high-scoring
+      // category can still crowd out the others after this client-side cap.
+      var perCatCount = {};
+      var balanced = data.filter(function(item) {
+        var cat = item.category || 'others';
+        perCatCount[cat] = (perCatCount[cat] || 0) + 1;
+        return perCatCount[cat] <= 10;
+      });
+      balanced.forEach(function(item, i) {
         VIDEOS.push({
           rank: i+1,
           cat: item.category || 'others',

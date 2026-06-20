@@ -253,12 +253,27 @@ const dbHelpers = {
   },
 
   getScannedVideos: async (category, mixType, limit) => {
-    let sql = 'SELECT * FROM scanned_videos WHERE 1=1';
-    const params = [];
-    if (category) { params.push(category); sql += ` AND category = $${params.length}`; }
-    if (mixType) { params.push(mixType); sql += ` AND mix_type = $${params.length}`; }
-    params.push(limit || 240);
-    sql += ` ORDER BY score DESC, scanned_at DESC LIMIT $${params.length}`;
+    if (category) {
+      let sql = 'SELECT * FROM scanned_videos WHERE category = $1';
+      const params = [category];
+      if (mixType) { params.push(mixType); sql += ` AND mix_type = $${params.length}`; }
+      params.push(limit || 240);
+      sql += ` ORDER BY score DESC, scanned_at DESC LIMIT $${params.length}`;
+      return all(sql, params);
+    }
+    // No category filter: balance across categories instead of a flat
+    // global top-N-by-score, which let 1-2 high-scoring categories
+    // crowd out the rest entirely even when they had fewer total videos.
+    const perCategory = Math.ceil((limit || 240) / 5);
+    let sql = `
+      SELECT * FROM (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY category ORDER BY score DESC, scanned_at DESC) AS rn
+        FROM scanned_videos
+        ${mixType ? 'WHERE mix_type = $1' : ''}
+      ) sub WHERE rn <= ${mixType ? '$2' : '$1'}
+      ORDER BY score DESC, scanned_at DESC
+    `;
+    const params = mixType ? [mixType, perCategory] : [perCategory];
     return all(sql, params);
   },
 

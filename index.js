@@ -290,24 +290,34 @@ app.get('/callback', async (req, res) => {
       [handle, tokenData.access_token, tokenData.refresh_token]
     );
     logger.info('TikTok account connected: ' + handle);
-    // Fetch follower count now that the connection includes user.info.stats.
-    // Best-effort: if this fails (e.g. an account reconnected before this
-    // scope existed and TikTok hasn't re-prompted consent), don't block the
-    // connection itself on it.
-    try {
-      const { getAccountInfo, getTotalViews } = require('./tiktok-publisher');
-      const info = await getAccountInfo(tokenData.access_token);
-      if (info && typeof info.follower_count === 'number') {
-        await dbHelpers.updateAccount(handle, { followers: info.follower_count });
-        logger.info(handle + ': ' + info.follower_count + ' abonnes recuperes');
+    // Only attempt follower/views stats if TikTok's token response confirms
+    // the relevant scope was actually granted (it echoes back the granted
+    // scopes in tokenData.scope). Right now user.info.stats/video.list are
+    // not requested at all (pending TikTok app approval), so this correctly
+    // does nothing — no more guaranteed-to-fail 401 calls cluttering the logs.
+    // Once those scopes are added back to getOAuthUrl and approved, this will
+    // start working automatically with no further code change needed.
+    const grantedScope = tokenData.scope || '';
+    if (grantedScope.includes('user.info.stats') || grantedScope.includes('video.list')) {
+      try {
+        const { getAccountInfo, getTotalViews } = require('./tiktok-publisher');
+        if (grantedScope.includes('user.info.stats')) {
+          const info = await getAccountInfo(tokenData.access_token);
+          if (info && typeof info.follower_count === 'number') {
+            await dbHelpers.updateAccount(handle, { followers: info.follower_count });
+            logger.info(handle + ': ' + info.follower_count + ' abonnes recuperes');
+          }
+        }
+        if (grantedScope.includes('video.list')) {
+          const totalViews = await getTotalViews(tokenData.access_token);
+          if (totalViews !== null) {
+            await dbHelpers.updateAccount(handle, { total_views: totalViews });
+            logger.info(handle + ': ' + totalViews + ' vues totales recuperees');
+          }
+        }
+      } catch (statsErr) {
+        logger.warn('Could not fetch stats for ' + handle + ': ' + statsErr.message);
       }
-      const totalViews = await getTotalViews(tokenData.access_token);
-      if (totalViews !== null) {
-        await dbHelpers.updateAccount(handle, { total_views: totalViews });
-        logger.info(handle + ': ' + totalViews + ' vues totales recuperees');
-      }
-    } catch (statsErr) {
-      logger.warn('Could not fetch stats for ' + handle + ': ' + statsErr.message);
     }
     res.send('<html><body style="font-family:sans-serif;text-align:center;padding:40px;background:#f7f5ff"><h1 style="color:#7c3aed">Compte connecte !</h1><p><strong>' + handle + '</strong> est maintenant lie a ViralBot.</p><p>Tu peux fermer cette fenetre.</p></body></html>');
   } catch (err) {
@@ -335,7 +345,17 @@ app.post('/api/scan', async (req, res) => {
 
 app.get('/api/queue', async (req, res) => {
   try {
-    res.json(await dbHelpers.all("SELECT * FROM video_queue WHERE status = 'pending' ORDER BY scheduled_at ASC LIMIT 100"));
+    // Per-account limit instead of a flat global one — otherwise accounts
+    // with short queues (fewer total items) fill the entire global window
+    // with their full backlog, while accounts with long queues have their
+    // later items scheduled too far out to ever appear here at all.
+    res.json(await dbHelpers.all(`
+      SELECT * FROM (
+        SELECT *, ROW_NUMBER() OVER (PARTITION BY account_id ORDER BY scheduled_at ASC) AS rn
+        FROM video_queue WHERE status = 'pending'
+      ) sub WHERE rn <= 15
+      ORDER BY scheduled_at ASC
+    `));
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
