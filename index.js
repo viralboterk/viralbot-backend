@@ -168,6 +168,28 @@ app.get('/api/r2-health', async (req, res) => {
   }
 });
 
+// Diagnostic: manually trigger creator_info/query for a specific account
+// right now. TikTok's docs say this should be called before every publish;
+// our code never did. Lets us test immediately whether calling it has any
+// effect on an account that currently shows PUBLISH_COMPLETE but no visible
+// content, without waiting for that account's next scheduled publish.
+app.get('/api/diagnose-creator-info', async (req, res) => {
+  const { handle } = req.query;
+  if (!handle) return res.status(400).json({ error: 'Usage: /api/diagnose-creator-info?handle=@xxx' });
+  try {
+    const account = await dbHelpers.get('SELECT * FROM accounts WHERE handle = $1', [handle]);
+    if (!account || !account.access_token) {
+      return res.status(404).json({ error: 'Account not found or not connected: ' + handle });
+    }
+    const { queryCreatorInfo } = require('./tiktok-publisher');
+    const info = await queryCreatorInfo(account.access_token);
+    res.json({ handle, creatorInfo: info });
+  } catch (err) {
+    const tiktokError = err.response && err.response.data;
+    res.status(500).json({ error: err.message, tiktokResponse: tiktokError || null });
+  }
+});
+
 // Diagnostic: re-check TikTok's CURRENT status for a publish_id we already
 // have logged from a past publish attempt. Our own code only checks status
 // once, right after publishing (PUBLISH_COMPLETE) — it never re-checks

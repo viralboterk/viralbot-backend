@@ -133,12 +133,16 @@ async function buildDailyQueue(scanResults) {
       return true;
     });
 
-    // Filter out already published
-    // Check published status async before filtering
+    // Filter out already published AND already-queued-but-pending (the
+    // latter prevents the same video being added a second time when
+    // buildDailyQueue runs again later the same day — see isQueued comment).
     const publishedChecks = await Promise.all(
       allVideos.map(v => dbHelpers.isPublished(v.id, account.handle))
     );
-    const newVideos = allVideos.filter((v, i) => !publishedChecks[i]);
+    const queuedChecks = await Promise.all(
+      allVideos.map(v => dbHelpers.isQueued(v.id, account.handle))
+    );
+    const newVideos = allVideos.filter((v, i) => !publishedChecks[i] && !queuedChecks[i]);
 
     // Take up to 48
     const selected = newVideos.slice(0, 48);
@@ -226,7 +230,28 @@ async function processQueue() {
 // video actually does" — both the cron loop below and the dashboard's manual
 // "Publier maintenant" button call this exact function, so there is no
 // separate/fake code path for the manual trigger.
+// Tracks queue item IDs currently being processed, so the same row can never
+// be picked up twice concurrently — e.g. a manual "Publier maintenant" click
+// on an overdue item colliding with the automated 5-min cron also picking up
+// that same now-due item at the same time. The existing isPublished() check
+// only catches this AFTER one attempt has fully finished; this catches it
+// the instant a second attempt tries to start.
+const itemsBeingProcessed = new Set();
+
 async function publishQueueItem(account, item) {
+  if (itemsBeingProcessed.has(item.id)) {
+    logger.warn('Queue item ' + item.id + ' is already being processed — skipping duplicate concurrent attempt');
+    return { success: false, reason: 'already_in_progress' };
+  }
+  itemsBeingProcessed.add(item.id);
+  try {
+    return await publishQueueItemInner(account, item);
+  } finally {
+    itemsBeingProcessed.delete(item.id);
+  }
+}
+
+async function publishQueueItemInner(account, item) {
   try {
     logger.info('Publishing to ' + account.handle + ': ' + item.title);
     account = await ensureValidToken(account);

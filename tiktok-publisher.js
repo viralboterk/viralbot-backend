@@ -50,8 +50,31 @@ async function refreshToken(refresh_token) {
 }
 
 // Publish video to TikTok
+// TikTok's docs say this must be called before every post to get the
+// creator's available privacy levels — our code has never called it,
+// always hardcoding SELF_ONLY directly. Calling it now for compliance, and
+// because it may have a side effect on TikTok's end (establishing/confirming
+// the creator-app relationship) that a direct video/init/ call skips.
+async function queryCreatorInfo(accessToken) {
+  try {
+    const res = await axios.post(TIKTOK_API + '/post/publish/creator_info/query/', {}, {
+      headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' }
+    });
+    return res.data && res.data.data;
+  } catch (err) {
+    logger.warn('TikTok creator_info query error: ' + err.message);
+    return null;
+  }
+}
+
 async function publishVideo(account, videoData) {
   try {
+    const creatorInfo = await queryCreatorInfo(account.access_token);
+    if (creatorInfo) {
+      logger.info(account.handle + ' creator_info: privacy_level_options=' +
+        JSON.stringify(creatorInfo.privacy_level_options) + ', max_video_post_duration_sec=' +
+        creatorInfo.max_video_post_duration_sec);
+    }
     logger.info('Publishing with privacy_level=' + PRIVACY_LEVEL + ' for ' + account.handle);
     const initRes = await axios.post(TIKTOK_API + '/post/publish/video/init/', {
       post_info: {
@@ -172,4 +195,4 @@ async function getTotalViews(accessToken) {
 
 function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
-module.exports = { getOAuthUrl, exchangeCodeForToken, refreshToken, publishVideo, getAccountInfo, getTotalViews };
+module.exports = { getOAuthUrl, exchangeCodeForToken, refreshToken, publishVideo, getAccountInfo, getTotalViews, queryCreatorInfo };

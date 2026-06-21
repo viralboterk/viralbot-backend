@@ -185,6 +185,19 @@ const dbHelpers = {
     return !!row;
   },
 
+  // Catches the case isPublished() can't: a video already sitting in this
+  // account's PENDING queue from an earlier buildDailyQueue run today, not
+  // yet published. Without this, re-scanning multiple times per day (which
+  // happens regularly) re-adds the same video as a second, duplicate row,
+  // and both eventually get published to the same account.
+  isQueued: async (videoId, accountId) => {
+    const row = await get(
+      "SELECT id FROM video_queue WHERE video_id = $1 AND account_id = $2 AND status = 'pending'",
+      [videoId, accountId]
+    );
+    return !!row;
+  },
+
   markPublished: async (videoId, accountId, category, title) => {
     await run(
       'INSERT INTO published_videos (video_id, account_id, category, title) VALUES ($1, $2, $3, $4) ON CONFLICT (video_id, account_id) DO NOTHING',
