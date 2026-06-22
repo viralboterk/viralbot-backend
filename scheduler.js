@@ -362,6 +362,7 @@ async function publishQueueItemInner(account, item) {
         }, 30 * 60 * 1000);
       }
       logger.info('✅ Published: ' + item.title + ' → ' + account.handle);
+      await dbHelpers.updateAccount(account.handle, { last_published_at: new Date().toISOString() });
       return { success: true, publishId: result.publishId };
     } else if (result.spam_risk) {
       // spam_risk_too_many_posts is a temporary daily rate limit, NOT a permanent strike.
@@ -388,6 +389,21 @@ async function publishQueueItemInner(account, item) {
       await dbHelpers.markQueueDone(item.id, 'failed');
       logger.error('❌ Failed (spam_risk — rescheduled to tomorrow): ' + item.title + ' → ' + account.handle);
       return { success: false, reason: 'spam_risk' };
+    } else if (result.active_user_cap) {
+      // reached_active_user_cap: the app-wide cap on distinct active creators
+      // was hit, not this account's own posting pace. Reschedule this item
+      // (and remaining pending ones for the account) to retry later instead
+      // of discarding it — by then another account may have rotated out of
+      // the "active" set, freeing a slot. No backoff/interval change here
+      // since the contention is cross-account, not this account's fault.
+      logger.warn('reached_active_user_cap on ' + account.handle + ' — rescheduling remaining queue to tomorrow');
+      await dbHelpers.run(
+        "UPDATE video_queue SET scheduled_at = NOW() + INTERVAL '24 hours' WHERE account_id = $1 AND status = 'pending'",
+        [account.handle]
+      );
+      await dbHelpers.markQueueDone(item.id, 'failed');
+      logger.error('❌ Failed (active_user_cap — rescheduled to tomorrow): ' + item.title + ' → ' + account.handle);
+      return { success: false, reason: 'active_user_cap' };
     } else {
       await dbHelpers.markQueueDone(item.id, 'failed');
       logger.error('❌ Failed: ' + item.title + ' → ' + account.handle);
@@ -408,6 +424,16 @@ async function processQueueInner() {
   if (hour < 6 || hour >= 22) return;
 
   const accounts = await dbHelpers.getAllActiveAccounts();
+  // Process starved accounts first (oldest last_published_at, or never
+  // published, first). Without this, a fixed processing order lets whichever
+  // accounts happen to come first in the DB monopolize TikTok's limited
+  // "active creator" slots (reached_active_user_cap) every single cycle,
+  // while accounts later in the order rarely get a real chance.
+  accounts.sort((a, b) => {
+    const aTime = a.last_published_at ? new Date(a.last_published_at).getTime() : 0;
+    const bTime = b.last_published_at ? new Date(b.last_published_at).getTime() : 0;
+    return aTime - bTime;
+  });
 
   for (let account of accounts) {
     const queue = await dbHelpers.getPendingQueue(account.handle);

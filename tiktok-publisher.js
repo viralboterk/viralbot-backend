@@ -139,6 +139,14 @@ async function publishVideo(account, videoData) {
         // Caller will reschedule this account's remaining items for tomorrow.
         return { success: false, spam_risk: true, error: tiktokErrorCode };
       }
+      if (tiktokErrorCode === 'reached_active_user_cap') {
+        // Unaudited apps can only have a limited number of DISTINCT creator
+        // accounts "active" at once across the whole app (separate from the
+        // per-account spam_risk rate limit). This is a temporary, rolling-
+        // window condition — not this account's fault, and not a strike.
+        // Caller will reschedule rather than discarding the video.
+        return { success: false, active_user_cap: true, error: tiktokErrorCode };
+      }
       // Any other 403 (unaudited, suspended, etc.) is a real strike.
       dbHelpers.updateAccount(account.handle, { status: 'strike' });
     }
