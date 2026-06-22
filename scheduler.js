@@ -117,21 +117,19 @@ async function buildDailyQueue(scanResults) {
       account.post_interval_min = 20;
     }
 
-    const recentVideos = Array.isArray(catVideos.recent) ? catVideos.recent : [];
-    const evergreenVideos = Array.isArray(catVideos.evergreen) ? catVideos.evergreen : [];
-    // Deduplicate across recent + evergreen — the same video can appear in
-    // both arrays if it ranked in both search windows. Without this, it gets
-    // queued twice (different mixType, different AI title) and published twice
-    // to the same account, which is the anti-rediffusion bug seen in the logs.
+    // Unified search result (no recent/evergreen split anymore) — dedup is
+    // still applied defensively in case the same video_id somehow appears
+    // twice within the unified list (shouldn't happen given scanCategory's
+    // own dedup, but cheap insurance against ever double-queuing it).
+    const scannedVideos = Array.isArray(catVideos.all) ? catVideos.all : [];
     const seenIds = new Set();
-    const allVideos = [
-      ...recentVideos.map(v => ({ ...v, mixType: 'recent' })),
-      ...evergreenVideos.map(v => ({ ...v, mixType: 'evergreen' })),
-    ].filter(v => {
-      if (seenIds.has(v.id)) return false;
-      seenIds.add(v.id);
-      return true;
-    });
+    const allVideos = scannedVideos
+      .map(v => ({ ...v, mixType: 'all' }))
+      .filter(v => {
+        if (seenIds.has(v.id)) return false;
+        seenIds.add(v.id);
+        return true;
+      });
 
     // Filter out already published AND already-queued-but-pending (the
     // latter prevents the same video being added a second time when

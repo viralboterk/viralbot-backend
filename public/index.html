@@ -683,8 +683,6 @@ async function runPipeline(){
 function renderCatDetail(){
   document.getElementById('cat-detail-grid').innerHTML=CATS.map(c=>{
     const vids=VIDEOS.filter(v=>v.cat===c.id);
-    const recent=vids.filter(v=>v.mix==='recent');
-    const ever=vids.filter(v=>v.mix==='ever');
     const acc=ACCOUNTS.filter(a=>a.cat===c.id);
     return `<div class="card" style="border-left:4px solid ${c.col};margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
@@ -698,14 +696,10 @@ function renderCatDetail(){
           <div style="font-size:11px;color:var(--text3)">vidéos/jour</div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px">
-        <div style="padding:10px;background:var(--green-l);border-radius:var(--r);text-align:center;border:1px solid rgba(5,150,105,0.2)">
-          <div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--green)">24</div>
-          <div style="font-size:10px;color:var(--green);font-weight:600">🕐 Récentes 24h</div>
-        </div>
-        <div style="padding:10px;background:var(--gold-l);border-radius:var(--r);text-align:center;border:1px solid rgba(180,83,9,0.2)">
-          <div style="font-family:'DM Serif Display',serif;font-size:18px;color:var(--gold)">24</div>
-          <div style="font-size:10px;color:var(--gold);font-weight:600">⭐ Evergreen 6 ans</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+        <div style="padding:10px;background:${c.light};border-radius:var(--r);text-align:center;border:1px solid ${c.col}30">
+          <div style="font-family:'DM Serif Display',serif;font-size:18px;color:${c.col}">${vids.length}</div>
+          <div style="font-size:10px;color:${c.col};font-weight:600">🔍 Trouvées (recherche unifiée)</div>
         </div>
         <div style="padding:10px;background:${c.light};border-radius:var(--r);text-align:center;border:1px solid ${c.col}30">
           <div style="font-family:'DM Serif Display',serif;font-size:18px;color:${c.col}">${acc.length}</div>
@@ -723,7 +717,7 @@ function renderCatDetail(){
 // ===== TOP 48 =====
 function initVideoFilters(){
   document.getElementById('cat-filters').innerHTML=[['all','🎬 Toutes les catégories'],...CATS.map(c=>[c.id,c.icon+' '+c.label])].map(([id,lbl])=>`<button class="fbtn ${id==='all'?'active':''} ${id!=='all'?'cat-f-'+id:''}" onclick="setCatFilter('${id}',this)">${lbl}</button>`).join('');
-  document.getElementById('mix-filters').innerHTML=[['all','📋 Tout le mix'],['recent','🕐 Récentes (24h) uniquement'],['ever','⭐ Evergreen (6 ans) uniquement']].map(([id,lbl],i)=>`<button class="fbtn ${i===0?'active':''}" onclick="setMixFilter('${id}',this)">${lbl}</button>`).join('');
+  document.getElementById('mix-filters').innerHTML='';
   updateVidSel();
 }
 
@@ -755,7 +749,6 @@ function renderVideos(){
         <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:5px">${v.title}</div>
         <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;font-size:11px;color:var(--text2)">
           ${catBadge(v.cat)}
-          <span class="badge ${v.mix==='recent'?'b-green':'b-gold'}">${v.mix==='recent'?'🕐 Récente':'⭐ Evergreen'}</span>
           <span>⏱ ${v.dur}</span>
           <span style="font-weight:700;color:var(--text)">👁 ${v.views}</span>
           <span>↗ ${v.shares}</span>
@@ -1057,7 +1050,6 @@ function renderTT(){
   document.getElementById('tt-meta-rows').innerHTML=[
     ['Rang','#'+v.rank],
     ['Catégorie',(cat?.icon||'?')+' '+(cat?.label||'?')],
-    ['Type',v.mix==='recent'?'🕐 Récente (24h)':'⭐ Evergreen (6 ans)'],
     ['Vues',v.views],['Partages',v.shares],['Commentaires',v.comments],
     ['Durée',v.dur],['Score',v.score?v.score+'/100':'—'],['Langue',v.lang],
   ].map(([k,val])=>`<div class="tt-meta-row"><span style="color:var(--text2);font-size:12px">${k}</span><span style="font-weight:700;font-size:12px">${val}</span></div>`).join('');
@@ -1448,7 +1440,7 @@ function loadRealVideos() {
           lang: item.lang || 'EN',
           emoji: emojis[item.category] || '📦',
           dur: item.duration ? item.duration + 's' : '60-90s',
-          mix: item.mix_type || 'recent',
+          mix: item.mix_type || 'all',
           videoId: item.video_id,
         });
       });
@@ -1492,7 +1484,6 @@ function loadTopPerformers() {
           '<div style="font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:3px">' + (v.title||'Vidéo en attente') + '</div>' +
           '<div style="display:flex;gap:6px">' +
           '<span class="cat-badge cat-' + (v.category||'others') + '">' + (cat ? cat.icon+' '+cat.label : v.category) + '</span>' +
-          '<span style="font-size:11px;color:var(--text2)">' + (v.mix_type==='recent'?'🕐 Récente':'⭐ Evergreen') + '</span>' +
           '</div></div></div>';
       }).join('');
     }).catch(function() {});
