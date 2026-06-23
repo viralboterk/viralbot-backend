@@ -351,7 +351,6 @@ select option{background:var(--bg2)}
 
     <!-- DASHBOARD -->
     <div id="panel-dashboard" class="panel active">
-      <div class="alert alert-yt" style="margin-bottom:16px"><span style="font-size:15px">▶️</span><span><strong>YouTube → TikTok actif sur 10 comptes.</strong> Publication en mode privé (Seulement moi) en attendant la validation de l'audit Content Posting API. Instagram, Twitch et Kick suivront dans une phase ultérieure.</span></div>
       <div class="metrics" id="dash-metrics"></div>
 
       <!-- CAT STATS -->
@@ -539,6 +538,7 @@ const CATS = [
 
 // ===== DATA =====
 const VIDEOS = []; // Loaded from Railway via /api/queue
+let CATEGORY_TOTALS = {}; // Real per-category scanned counts, uncapped (see loadRealVideos)
 
 const ACCOUNTS = []; // Loaded from Railway on startup
 
@@ -601,13 +601,13 @@ function renderCatStats(){
   const el=document.getElementById('cat-stats');
   if(!el)return;
   el.innerHTML=CATS.map(c=>{
-    const vids=VIDEOS.filter(v=>v.cat===c.id);
+    const total=CATEGORY_TOTALS[c.id]||0;
     const acc=ACCOUNTS.filter(a=>a.cat===c.id);
     return `<div class="cat-stat-card" onclick="go('top48',null);setCatFilter('${c.id}')" style="border-top:3px solid ${c.col}">
       <div class="cat-stat-icon">${c.icon}</div>
       <div class="cat-stat-name" style="color:${c.col}">${c.label}</div>
-      <div class="cat-stat-count">${vids.length}</div>
-      <div class="cat-stat-sub">${acc.length} compte${acc.length>1?'s':''} · ${vids.length} vidéos en file</div>
+      <div class="cat-stat-count">${total}</div>
+      <div class="cat-stat-sub">${acc.length} compte${acc.length>1?'s':''} · ${total} vidéos en file</div>
     </div>`;
   }).join('');
 }
@@ -625,7 +625,7 @@ function clearLog(){actLogs=[];document.getElementById('activity-log').innerHTML
 
 // ===== PIPELINE =====
 function initPipeline(){
-  renderPipe(['pending','pending','pending','pending','pending','pending','pending','pending']);
+  renderPipe(['pending','pending','pending','pending','pending','pending']);
   document.getElementById('pipe-metrics').innerHTML = '<div style="color:var(--text3);font-size:12px;text-align:center;padding:10px">Chargement des statistiques réelles…</div>';
   document.getElementById('pipe-log').innerHTML = '<div style="color:var(--text3)">En attente des logs réels (chargés depuis Railway)…</div>';
 }
@@ -640,7 +640,7 @@ function renderPipeMetrics(stats){
 }
 
 function renderPipe(states){
-  const lbls=['① Scan YT','② Tri catégories','③ Récentes 24h','④ Evergreen 6ans','⑤ Filtrage','⑥ Déduplication','⑦ Édition IA','⑧ Diffusion'];
+  const lbls=['① Scan YT (unifié)','② Tri catégories','③ Filtrage','④ Déduplication','⑤ Édition IA','⑥ Diffusion'];
   document.getElementById('pipe-steps').innerHTML=lbls.map((l,i)=>`<div style="display:flex;align-items:center;flex-shrink:0"><div class="pipe-box ${states[i]==='done'?'pipe-done':states[i]==='active'?'pipe-active':'pipe-pending'}">${l}</div>${i<lbls.length-1?'<div class="pipe-arrow">→</div>':''}</div>`).join('');
 }
 
@@ -650,26 +650,26 @@ async function runPipeline(){
   document.getElementById('pipe-btn').disabled=true;
   document.getElementById('pipe-status').style.display='flex';
   document.getElementById('pipe-status').innerHTML='<div class="spinner"></div>Scan en cours sur Railway...';
-  renderPipe(['active','active','active','active','active','active','active','active']);
+  renderPipe(['active','active','active','active','active','active']);
   try {
     const r = await fetch('/api/scan', { method: 'POST', headers: {'Content-Type':'application/json'}, body: '{}' });
     const d = await r.json();
     if (d && d.alreadyRunning) {
-      renderPipe(['pending','pending','pending','pending','pending','pending','pending','pending']);
+      renderPipe(['pending','pending','pending','pending','pending','pending']);
       document.getElementById('pipe-status').innerHTML='<span style="color:var(--yellow);font-weight:600">⏳ Un scan est déjà en cours — patiente un peu</span>';
       notify('Un scan est déjà en cours','warn');
     } else if (d && d.success) {
-      renderPipe(['done','done','done','done','done','done','done','done']);
+      renderPipe(['done','done','done','done','done','done']);
       document.getElementById('pipe-status').innerHTML='<span style="color:var(--green);font-weight:600">✅ Scan lancé — résultats réels dans quelques minutes</span>';
       notify('Scan lancé sur Railway','success');
       addLog('success','Scan démarré sur Railway');
     } else {
-      renderPipe(['pending','pending','pending','pending','pending','pending','pending','pending']);
+      renderPipe(['pending','pending','pending','pending','pending','pending']);
       document.getElementById('pipe-status').innerHTML='<span style="color:var(--red);font-weight:600">⚠️ Serveur non joignable</span>';
       notify('Serveur non joignable','warn');
     }
   } catch(e) {
-    renderPipe(['pending','pending','pending','pending','pending','pending','pending','pending']);
+    renderPipe(['pending','pending','pending','pending','pending','pending']);
     document.getElementById('pipe-status').innerHTML='<span style="color:var(--red);font-weight:600">⚠️ Erreur réseau</span>';
     notify('Erreur réseau','warn');
   }
@@ -682,7 +682,7 @@ async function runPipeline(){
 // ===== CATEGORIES DETAIL =====
 function renderCatDetail(){
   document.getElementById('cat-detail-grid').innerHTML=CATS.map(c=>{
-    const vids=VIDEOS.filter(v=>v.cat===c.id);
+    const total=CATEGORY_TOTALS[c.id]||0;
     const acc=ACCOUNTS.filter(a=>a.cat===c.id);
     return `<div class="card" style="border-left:4px solid ${c.col};margin-bottom:12px">
       <div style="display:flex;align-items:center;gap:14px;margin-bottom:14px">
@@ -698,7 +698,7 @@ function renderCatDetail(){
       </div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
         <div style="padding:10px;background:${c.light};border-radius:var(--r);text-align:center;border:1px solid ${c.col}30">
-          <div style="font-family:'DM Serif Display',serif;font-size:18px;color:${c.col}">${vids.length}</div>
+          <div style="font-family:'DM Serif Display',serif;font-size:18px;color:${c.col}">${total}</div>
           <div style="font-size:10px;color:${c.col};font-weight:600">🔍 Trouvées (recherche unifiée)</div>
         </div>
         <div style="padding:10px;background:${c.light};border-radius:var(--r);text-align:center;border:1px solid ${c.col}30">
@@ -883,11 +883,7 @@ function assignCat(accId, catId){
     addLog('warn',`Catégorie retirée de ${acc.handle}`);
   }
   // Update cat stats
-  document.getElementById('cat-stats').innerHTML=CATS.map(c=>{
-    const vids=VIDEOS.filter(v=>v.cat===c.id);
-    const accs=ACCOUNTS.filter(a=>a.cat===c.id);
-    return `<div class="cat-stat-card" onclick="go('top48',null);setCatFilter('${c.id}')" style="border-top:3px solid ${c.col}"><div class="cat-stat-icon">${c.icon}</div><div class="cat-stat-name" style="color:${c.col}">${c.label}</div><div class="cat-stat-count">${accs.length}</div><div class="cat-stat-sub">compte${accs.length>1?'s':''} assigné${accs.length>1?'s':''}</div></div>`;
-  }).join('');
+  renderCatStats();
 }
 
 // ===== PLANNING =====
@@ -953,7 +949,7 @@ async function publishNow(id){
 // ===== STRIKES =====
 function initStrikes(){
   const struck = ACCOUNTS.filter(a=>a.status==='warn');
-  const noteHtml = `<div class="step-item"><div><div style="font-weight:700;font-size:13px;margin-bottom:3px">Comment ça marche réellement</div><div style="font-size:12px;color:var(--text2)">Un compte passe en "strike" dès que TikTok refuse une publication avec une erreur 403 (compte suspendu, ou restriction de l'app). La file de ce compte reste en pause tant qu'il n'est pas repris manuellement ci-dessous — les autres comptes continuent normalement.</div></div></div>`;
+  const noteHtml = `<div class="step-item"><div><div style="font-weight:700;font-size:13px;margin-bottom:3px">Comment ça marche réellement</div><div style="font-size:12px;color:var(--text2)">Les erreurs temporaires connues (trop de posts en 24h, plafond de comptes actifs côté app non auditée) sont gérées automatiquement — file reprogrammée, aucun strike. Une vraie "strike" se déclenche seulement pour une erreur 403 non reconnue (compte réellement suspendu, restriction sérieuse). La file de ce compte reste alors en pause tant qu'il n'est pas repris manuellement ci-dessous — les autres comptes continuent normalement.</div></div></div>`;
   if (!struck.length) {
     document.getElementById('strikes-proto').innerHTML = noteHtml + `<div style="text-align:center;padding:30px;color:var(--text3);font-size:13px">✅ Aucun compte en strike actuellement</div>`;
     return;
@@ -976,9 +972,6 @@ function initConfig(){
     {n:'YouTube Data API v3',i:'▶️',ok:ytWorking,d:ytWorking?'Dernier scan reçu — voir l\'onglet Pipeline pour la date exacte':'Aucun scan reçu pour l\'instant'},
     {n:'TikTok Content Posting API',i:'🎵',ok:tiktokConnected>0,d:tiktokConnected+' / '+ACCOUNTS.length+' comptes connectés (token OAuth actif)'},
     {n:'Cloudflare R2',i:'☁️',ok:null,loading:true,id:'r2-status-row',d:'Vérification en cours…'},
-    {n:'Instagram Graph API',i:'📸',ok:null,later:true,d:'Phase 3 — non démarré'},
-    {n:'Twitch API Helix',i:'🎮',ok:null,later:true,d:'Phase 3 — non démarré'},
-    {n:'Kick API',i:'🟢',ok:null,later:true,d:'Phase 3 — non démarré'},
   ].map(a=>{
     const badge = a.loading ? {c:'b-gray',t:'⏳ Vérification…'} : a.later ? {c:'b-gray',t:'⏳ Plus tard'} : a.ok===true ? {c:'b-green',t:'✅ Actif'} : a.ok===false ? {c:'b-yellow',t:'⚠️ À vérifier'} : {c:'b-gray',t:'ℹ️ Non vérifiable ici'};
     return `<div id="${a.id||''}" style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border)"><span style="font-size:19px">${a.i}</span><div style="flex:1"><div style="font-size:13px;font-weight:600">${a.n}</div><div style="font-size:11px;color:var(--text2)" id="${a.id?a.id+'-desc':''}">${a.d}</div></div><span class="badge ${badge.c}" id="${a.id?a.id+'-badge':''}">${badge.t}</span></div>`;
@@ -1008,7 +1001,7 @@ function initConfig(){
     });
   document.getElementById('config-params').innerHTML=`
     <div class="alert alert-yt" style="margin-bottom:14px"><span>ℹ️</span><span><strong>Configuration actuelle (lecture seule)</strong><br>Ces valeurs sont définies dans le code du serveur. Les modifier ici ne change rien tant qu'une vraie page de paramètres n'est pas branchée au backend.</span></div>
-    ${[['Durée minimum (sec)','60'],['Durée maximum (sec)','90'],['Vidéos par catégorie / jour','48'],['Intervalle entre posts (min)','20'],['Heure de début diffusion','06:00'],['Heure de fin diffusion','22:00']].map(([l,v])=>`<div class="form-grp"><label class="form-label">${l}</label><input type="text" value="${v}" disabled style="opacity:.65;cursor:not-allowed"></div>`).join('')}
+    ${[['Durée minimum (sec)','60'],['Durée maximum (sec)','90'],['Vidéos par catégorie / jour','48'],['Intervalle de départ entre posts (min)','20 — s\'élargit automatiquement par compte selon son historique'],['Heure de début diffusion','06:00'],['Heure de fin diffusion','22:00']].map(([l,v])=>`<div class="form-grp"><label class="form-label">${l}</label><input type="text" value="${v}" disabled style="opacity:.65;cursor:not-allowed"></div>`).join('')}
     <div style="display:flex;align-items:center;justify-content:space-between;padding:12px;background:var(--bg3);border-radius:var(--r);border:1px solid var(--border)"><div><div style="font-size:13px;font-weight:600">Segmentation par thématique</div><div style="font-size:11px;color:var(--text2);margin-top:2px">5 catégories configurées dans le code</div></div></div>`;
 }
 
@@ -1216,7 +1209,7 @@ function loadRealAccounts() {
           pubTotal: acc.published_total || 0, pubToday: acc.published_today || 0, strikes: 0,
           status: acc.status === 'active' ? 'ok' : acc.status === 'strike' ? 'warn' : 'pending',
           age: acc.created_at ? new Date(acc.created_at).toLocaleDateString('fr-FR') : 'Nouveau',
-          followers: acc.followers || 0, views: acc.total_views ? acc.total_views.toLocaleString('fr-FR') : '—',
+          followers: acc.followers || 0, views: Number(acc.total_views) ? Number(acc.total_views).toLocaleString('fr-FR') : '—',
           cat: acc.category || '',
           connected: !!acc.access_token,
         });
@@ -1419,15 +1412,36 @@ function loadRealVideos() {
       if (!data || !data.length) { addLog('info', 'File vide — lance un scan YouTube'); return; }
       VIDEOS.length = 0;
       var emojis = {movies:'🎬',stream:'🎮',sports:'⚽',divert:'🎉',others:'📦'};
-      // Backend already balances per category, but take a per-category slice
-      // here too (rather than a flat overall cut) so no single high-scoring
-      // category can still crowd out the others after this client-side cap.
-      var perCatCount = {};
-      var balanced = data.filter(function(item) {
+      // Real per-category totals, tracked BEFORE the display cap below — used
+      // by renderCatStats() so the dashboard cards show genuine counts rather
+      // than the 10-per-category cap meant only for the Top 48 tab's display.
+      CATEGORY_TOTALS = {};
+      data.forEach(function(item) {
         var cat = item.category || 'others';
-        perCatCount[cat] = (perCatCount[cat] || 0) + 1;
-        return perCatCount[cat] <= 10;
+        CATEGORY_TOTALS[cat] = (CATEGORY_TOTALS[cat] || 0) + 1;
       });
+      // Backend already balances per category by count, but the overall
+      // ORDER is still sorted by raw score across all categories combined —
+      // so if one category (e.g. "others") systematically scores higher,
+      // its 10 allotted videos still all cluster at ranks #1-10, before a
+      // single video from any other category appears. Group by category
+      // first (preserving each category's internal score order), then
+      // round-robin across the groups so the displayed ranking actually
+      // alternates between categories instead of clustering by raw score.
+      var byCat = {};
+      data.forEach(function(item) {
+        var cat = item.category || 'others';
+        if (!byCat[cat]) byCat[cat] = [];
+        if (byCat[cat].length < 10) byCat[cat].push(item);
+      });
+      var cats = Object.keys(byCat);
+      var balanced = [];
+      var maxLen = Math.max.apply(null, cats.map(function(c) { return byCat[c].length; }).concat([0]));
+      for (var round = 0; round < maxLen; round++) {
+        for (var ci = 0; ci < cats.length; ci++) {
+          if (byCat[cats[ci]][round]) balanced.push(byCat[cats[ci]][round]);
+        }
+      }
       balanced.forEach(function(item, i) {
         VIDEOS.push({
           rank: i+1,
@@ -1475,7 +1489,18 @@ function loadTopPerformers() {
       var el = document.getElementById('top-performers');
       if (!el || !data || !data.length) return;
       var emojis = {movies:'🎬',stream:'🎮',sports:'⚽',divert:'🎉',others:'📦'};
-      el.innerHTML = data.slice(0,5).map(function(v) {
+      // Take the single best-scoring video from EACH category (backend
+      // already orders by score desc within each), instead of a flat
+      // slice(0,5) — which let whichever category scored highest overall
+      // fill all 5 slots, hiding every other category from this widget.
+      var seenCats = {};
+      var topPerCat = data.filter(function(item) {
+        var cat = item.category || 'others';
+        if (seenCats[cat]) return false;
+        seenCats[cat] = true;
+        return true;
+      }).slice(0, 5);
+      el.innerHTML = topPerCat.map(function(v) {
         var cat = getCat(v.category);
         return '<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border)">' +
           '<div style="width:44px;height:44px;border-radius:10px;background:' + (cat ? cat.light : 'var(--bg3)') + ';display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0">' +
