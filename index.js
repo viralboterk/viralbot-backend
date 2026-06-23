@@ -472,11 +472,11 @@ app.get('/api/videos', async (req, res) => {
 app.get('/api/system', async (req, res) => {
   res.json({
     version: '1.0.0',
-    phase: 'Phase 1 — YouTube uniquement',
+    phase: 'YouTube → TikTok actif (mode privé, en attente d\'audit)',
     uptime: Math.floor(process.uptime()),
     lastScan: await dbHelpers.getStat('last_scan'),
     categories: ['movies', 'stream', 'sports', 'divert', 'others'],
-    schedule: '06:00 -> 22:00 - 1 video / 20 min - 48/jour/compte',
+    schedule: '06:00 -> 22:00 - intervalle adaptatif par compte - jusqu\'a 48/jour/compte',
   });
 });
 

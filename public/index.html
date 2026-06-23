@@ -7,7 +7,7 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="theme-color" content="#f7f5ff">
-<title>ViralBot — v0.6</title>
+<title>ViralBot — v1.0</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=DM+Serif+Display&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -304,7 +304,7 @@ select option{background:var(--bg2)}
   <div class="logo">
     <div class="logo-icon">⚡</div>
     <div style="flex:1"><div class="logo-name">ViralBot</div></div>
-    <span class="logo-v">v0.6</span>
+    <span class="logo-v">v1.0</span>
   </div>
   <div class="nav-section">Vue globale</div>
   <button class="nav-item active" onclick="go('dashboard',this)"><span class="nav-icon">📊</span>Dashboard</button>
@@ -325,7 +325,7 @@ select option{background:var(--bg2)}
       <div class="sys-dot"></div>
       <div>
         <div style="font-size:12px;font-weight:700;color:var(--green)">Système actif</div>
-        <div style="font-size:10px;color:var(--text2)" id="sys-sub">YouTube uniquement — Phase 1</div>
+        <div style="font-size:10px;color:var(--text2)" id="sys-sub">YouTube → TikTok actif</div>
       </div>
     </div>
   </div>
@@ -351,7 +351,7 @@ select option{background:var(--bg2)}
 
     <!-- DASHBOARD -->
     <div id="panel-dashboard" class="panel active">
-      <div class="alert alert-yt" style="margin-bottom:16px"><span style="font-size:15px">▶️</span><span><strong>Phase 1 — YouTube uniquement.</strong> TikTok, Instagram, Twitch et Kick seront activés après validation des performances.</span></div>
+      <div class="alert alert-yt" style="margin-bottom:16px"><span style="font-size:15px">▶️</span><span><strong>YouTube → TikTok actif sur 10 comptes.</strong> Publication en mode privé (Seulement moi) en attendant la validation de l'audit Content Posting API. Instagram, Twitch et Kick suivront dans une phase ultérieure.</span></div>
       <div class="metrics" id="dash-metrics"></div>
 
       <!-- CAT STATS -->
@@ -391,13 +391,13 @@ select option{background:var(--bg2)}
 
     <!-- CATEGORIES -->
     <div id="panel-categories" class="panel">
-      <div class="alert alert-purple"><span>📌</span><span>Chaque catégorie scanne indépendamment YouTube Shorts et constitue son propre Top 48 — 24 vidéos récentes (dernières 24h) + 24 evergreen (meilleures des 6 dernières années).</span></div>
+      <div class="alert alert-purple"><span>📌</span><span>Chaque catégorie scanne indépendamment YouTube Shorts — recherche unifiée sans limite d'âge, triée par score puis priorité de langue, jusqu'à 48 vidéos retenues par catégorie.</span></div>
       <div id="cat-detail-grid"></div>
     </div>
 
     <!-- TOP 48 PAR CATEGORIE -->
     <div id="panel-top48" class="panel">
-      <div class="alert alert-purple"><span>⏱️</span><span>Durée : <strong>60s minimum — 90s maximum</strong> · Mix : <strong>24 récentes (24h) + 24 evergreen (6 ans)</strong></span></div>
+      <div class="alert alert-purple"><span>⏱️</span><span>Durée : <strong>60s minimum — 90s maximum</strong> · Recherche unifiée sans limite d'âge · jusqu'à <strong>48 vidéos par catégorie</strong></span></div>
       <div class="filter-row" id="cat-filters"></div>
       <div class="filter-row" id="mix-filters"></div>
       <div id="vid-list"></div>
@@ -447,7 +447,7 @@ select option{background:var(--bg2)}
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px">
         <div>
           <div style="font-family:'DM Serif Display',serif;font-size:20px;color:var(--purple)">10 Comptes TikTok</div>
-          <div style="font-size:12px;color:var(--text2);margin-top:3px">Sélectionne une catégorie sur chaque compte · 48 vidéos/jour · 1 vidéo toutes les 20 min</div>
+          <div style="font-size:12px;color:var(--text2);margin-top:3px">Sélectionne une catégorie sur chaque compte · jusqu'à 48 vidéos/jour · intervalle adaptatif selon l'historique de chaque compte</div>
         </div>
         <button class="btn btn-primary" onclick="openAddModal()">+ Ajouter un compte</button>
       </div>
@@ -458,7 +458,7 @@ select option{background:var(--bg2)}
     <!-- PLANNING -->
     <div id="panel-planning" class="panel">
       <div class="card">
-        <div class="card-hdr"><div class="card-title">📅 Planning — Aujourd'hui</div><div style="font-size:12px;color:var(--text2)">1 vidéo / 20 min · 48 vidéos/jour · 10 comptes</div></div>
+        <div class="card-hdr"><div class="card-title">📅 Planning — Aujourd'hui</div><div style="font-size:12px;color:var(--text2)">Intervalle adaptatif par compte · jusqu'à 48 vidéos/jour · 10 comptes</div></div>
         <div id="planning-content"></div>
       </div>
     </div>
@@ -472,7 +472,7 @@ select option{background:var(--bg2)}
     <!-- CONFIG -->
     <div id="panel-config" class="panel">
       <div class="grid2">
-        <div class="card"><div class="card-hdr"><div class="card-title">🔌 APIs — Phase 1</div></div><div id="apis-list"></div></div>
+        <div class="card"><div class="card-hdr"><div class="card-title">🔌 APIs connectées</div></div><div id="apis-list"></div></div>
         <div class="card"><div class="card-hdr"><div class="card-title">⚙️ Paramètres globaux</div></div><div id="config-params"></div></div>
       </div>
     </div>
@@ -555,7 +555,7 @@ setInterval(()=>{document.getElementById('clock').textContent=new Date().toLocal
 
 // ===== NAV =====
 const TITLES={dashboard:'Dashboard',pipeline:'Pipeline live',categories:'5 Catégories',top48:'Top 48 par catégorie',filtre:'Filtres copyright',edition:'Édition IA',comptes:'10 Comptes TikTok',planning:'Planning',strikes:'Strikes',config:'Config API'};
-const SUBS={dashboard:'Vue d\'ensemble — Phase 1 YouTube',pipeline:'Cycle de traitement par catégorie',categories:'Gestion des 5 catégories YouTube',top48:'24 récentes + 24 evergreen par catégorie',filtre:'Protection anti-strikes YouTube',edition:'Génération automatique de contenu',comptes:'Assignation catégorie + monitoring',planning:'Calendrier de diffusion',strikes:'Alertes et protocole anti-ban',config:'YouTube API + paramètres'};
+const SUBS={dashboard:'Vue d\'ensemble — YouTube → TikTok',pipeline:'Cycle de traitement par catégorie',categories:'Gestion des 5 catégories YouTube',top48:'Recherche unifiée — jusqu\'à 48 par catégorie',filtre:'Protection anti-strikes YouTube',edition:'Génération automatique de contenu',comptes:'Assignation catégorie + monitoring',planning:'Calendrier de diffusion',strikes:'Alertes et protocole anti-ban',config:'YouTube API + paramètres'};
 
 function go(id,btn){
   document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));
@@ -1384,7 +1384,7 @@ window.addEventListener('load', function() {
     .then(function(r) { return r.json(); })
     .then(function(info) {
       var sub = document.getElementById('sys-sub');
-      if (sub) sub.textContent = info.phase || 'Phase 1 — YouTube';
+      if (sub) sub.textContent = info.phase || 'YouTube → TikTok actif';
       addLog('success', 'Serveur actif — ' + Math.floor((info.uptime||0)/60) + ' min uptime');
       if (info.lastScan) { lastScanSeen = info.lastScan; addLog('info', 'Dernier scan : ' + new Date(info.lastScan).toLocaleString('fr-FR')); if (document.getElementById('apis-list')) initConfig(); }
     })
