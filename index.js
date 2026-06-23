@@ -158,6 +158,21 @@ app.get('/api/blacklist', async (req, res) => {
   }
 });
 
+// Manually clear the internal quota-exhausted flag. Useful if it was set
+// incorrectly (e.g. by the allEmpty bug fixed in v35, which marked quota
+// exhausted even on fully successful scans) rather than by a genuine 429
+// from YouTube. Safe either way: if the real quota IS still exhausted, the
+// next scan attempt will just hit a 429 and re-set this flag normally.
+app.get('/api/clear-quota-flag', async (req, res) => {
+  try {
+    const before = await dbHelpers.getStat('quota_exhausted_until');
+    await dbHelpers.run("DELETE FROM system_stats WHERE key = 'quota_exhausted_until'");
+    res.json({ cleared: true, previousValue: before || null });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.get('/api/r2-health', async (req, res) => {
   try {
     const { checkR2Health } = require('./video-downloader');
