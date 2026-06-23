@@ -534,7 +534,7 @@ function initScheduler() {
             const categoryKeys = Object.keys(results).filter(k => !k.startsWith('_'));
             const allEmpty = categoryKeys.every(k => {
               const r = results[k];
-              return (!r.recent || r.recent.length === 0) && (!r.evergreen || r.evergreen.length === 0);
+              return !r.all || r.all.length === 0;
             });
             if (results._quotaExceeded || allEmpty) {
               await markQuotaExhausted();
@@ -589,7 +589,7 @@ function initScheduler() {
               const categoryKeys = Object.keys(results).filter(k => !k.startsWith('_'));
               const allEmpty = categoryKeys.every(k => {
                 const r = results[k];
-                return (!r.recent || r.recent.length === 0) && (!r.evergreen || r.evergreen.length === 0);
+                return !r.all || r.all.length === 0;
               });
               if (results._quotaExceeded || allEmpty) {
                 await markQuotaExhausted();
