@@ -88,7 +88,7 @@ async function tryCobaltPrivate(videoId, diag) {
     const status = e.response ? e.response.status : 'no-status';
     const data = e.response ? JSON.stringify(e.response.data).substring(0, 150) : e.message;
     logger.error('Private Cobalt error for ' + videoId + ' [' + status + ']: ' + data);
-    if (diag && getCobaltErrorCode(e) === 'error.api.youtube.login') diag.youtubeLoginRequired = true;
+    if (diag) { const code = getCobaltErrorCode(e); if (code === 'error.api.youtube.login') diag.youtubeLoginRequired = true; if (code === 'error.api.content.video.unavailable') diag.videoUnavailable = true; }
     return null;
   }
 }
@@ -118,7 +118,7 @@ async function tryCobaltFallback(videoId, diag) {
     const status = e.response ? e.response.status : 'no-status';
     const data = e.response ? JSON.stringify(e.response.data).substring(0, 150) : e.message;
     logger.error('Private Cobalt fallback error for ' + videoId + ' [' + status + ']: ' + data);
-    if (diag && getCobaltErrorCode(e) === 'error.api.youtube.login') diag.youtubeLoginRequired = true;
+    if (diag) { const code = getCobaltErrorCode(e); if (code === 'error.api.youtube.login') diag.youtubeLoginRequired = true; if (code === 'error.api.content.video.unavailable') diag.videoUnavailable = true; }
     return null;
   }
 }
@@ -148,7 +148,7 @@ async function tryCobaltShort(videoId, diag) {
     const status = e.response ? e.response.status : 'no-status';
     const data = e.response ? JSON.stringify(e.response.data).substring(0, 150) : e.message;
     logger.error('Private Cobalt short URL error for ' + videoId + ' [' + status + ']: ' + data);
-    if (diag && getCobaltErrorCode(e) === 'error.api.youtube.login') diag.youtubeLoginRequired = true;
+    if (diag) { const code = getCobaltErrorCode(e); if (code === 'error.api.youtube.login') diag.youtubeLoginRequired = true; if (code === 'error.api.content.video.unavailable') diag.videoUnavailable = true; }
     return null;
   }
 }
@@ -202,7 +202,7 @@ async function downloadAndUploadToR2(videoId, category) {
     return { url: null, youtubeLoginRequired: false };
   }
 
-  const diag = { youtubeLoginRequired: false };
+  const diag = { youtubeLoginRequired: false, videoUnavailable: false };
 
   try {
     const r2Key = 'videos/' + category + '/' + videoId + '.mp4';
@@ -226,6 +226,13 @@ async function downloadAndUploadToR2(videoId, category) {
         logger.error('Download attempt ' + attempt + '/' + MAX_ATTEMPTS + ' failed for ' + videoId + ': ' + err.message);
       }
       if (videoBuffer && videoBuffer.length >= 10000) break;
+      if (diag.videoUnavailable) {
+        // error.api.content.video.unavailable means the video is genuinely
+        // gone (deleted, private, region-blocked) — a fresh Cobalt
+        // negotiation will never fix this, so stop wasting attempts/time.
+        logger.warn('Video ' + videoId + ' reported unavailable by YouTube — skipping remaining retries');
+        break;
+      }
       if (attempt < MAX_ATTEMPTS) {
         logger.warn('Downloaded file too small for ' + videoId + ': ' + (videoBuffer ? videoBuffer.length : 0) +
           ' bytes — retrying (attempt ' + (attempt + 1) + '/' + MAX_ATTEMPTS + ') with a fresh Cobalt negotiation');
@@ -235,7 +242,7 @@ async function downloadAndUploadToR2(videoId, category) {
     if (!videoBuffer || videoBuffer.length < 10000) {
       logger.error('Downloaded file too small for ' + videoId + ' after ' + MAX_ATTEMPTS + ' attempts: ' +
         (videoBuffer ? videoBuffer.length : 0) + ' bytes');
-      return { url: null, youtubeLoginRequired: diag.youtubeLoginRequired };
+      return { url: null, youtubeLoginRequired: diag.youtubeLoginRequired, videoUnavailable: diag.videoUnavailable };
     }
 
     logger.info('Downloaded ' + videoId + ': ' + (videoBuffer.length / 1024 / 1024).toFixed(1) + 'MB');
@@ -252,7 +259,7 @@ async function downloadAndUploadToR2(videoId, category) {
 
   } catch (err) {
     logger.error('downloadAndUploadToR2 error for ' + videoId + ': ' + err.message);
-    return { url: null, youtubeLoginRequired: diag.youtubeLoginRequired };
+    return { url: null, youtubeLoginRequired: diag.youtubeLoginRequired, videoUnavailable: diag.videoUnavailable };
   }
 }
 

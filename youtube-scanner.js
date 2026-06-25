@@ -139,14 +139,15 @@ function parseDuration(iso) {
 const INDIAN_CINEMA_MARKERS = [
   'bollywood', 'tollywood', 'kollywood', 'telugu', 'tamil nadu', 'tamil movie',
   'hindi movie', 'hindi serial', 'punjabi movie', 'malayalam movie', 'kannada movie',
-  'bengali movie', 'marathi movie', 'desi drama',
+  'bengali movie', 'bangla cinema', 'bengali cinema', 'marathi movie', 'desi drama',
   // Frequently-recurring actor/director names observed in this category's
   // scan results — a practical signal given titles are usually in English
   // even when the underlying audio is not.
   'venkatesh', 'mahesh babu', ' ntr ', 'amitabh bachchan', 'pushpa', 'rajamouli',
   'allu arjun', 'prabhas', 'rajinikanth', 'shah rukh khan', 'salman khan',
   'akshay kumar', 'ranveer singh', 'sundeep kishan', 'asrani', 'rekha',
-  'abbayi garu', 'beeruva', 'raja saab', 'drishyam', 'kgf chapter',
+  'abbayi garu', 'beeruva', 'raja saab', 'drishyam', 'kgf chapter', 'bahubali',
+  'johny lever', 'ranbir kapoor', 'siyam ahmed', 'south indian movie', 'south indian cinema',
 ];
 
 function detectLanguageTier(video) {
