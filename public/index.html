@@ -973,7 +973,12 @@ async function initPlanning(){
           <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.title||'(sans titre)'}</div>
           <div style="font-size:11px;color:var(--text2)">${cat?.icon||''} ${item.account_id} · prévu ${time}</div>
         </div>
-        <button class="btn btn-primary btn-sm" id="q-btn-${item.id}" onclick="openPM(${item.id}, ${JSON.stringify(item.title||'')}, '${(item.account_id||'').replace(/'/g,"\\'")}', '${item.category||''}')">▶ Publier sur TikTok</button>
+        <button class="btn btn-primary btn-sm" id="q-btn-${item.id}"
+          data-pm-id="${item.id}"
+          data-pm-title="${(item.title||'').replace(/"/g,'&quot;').replace(/'/g,'&#39;')}"
+          data-pm-account="${(item.account_id||'').replace(/"/g,'&quot;')}"
+          data-pm-category="${item.category||''}"
+          onclick="openPMFromBtn(this)">▶ Publier sur TikTok</button>
       </div>`;
     }).join('')}
     </div>`;
@@ -1583,6 +1588,17 @@ const PM_PRIVACY_LABELS = {
 };
 
 const PM_CAT_ICONS = { movies:'🎬', stream:'🎮', sports:'⚽', divert:'😂', others:'📦' };
+
+// Helper appelé par le bouton HTML — utilise data-* pour éviter
+// tout problème de guillemets dans les titres de vidéos
+function openPMFromBtn(btn) {
+  openPM(
+    parseInt(btn.dataset.pmId, 10),
+    btn.dataset.pmTitle || '',
+    btn.dataset.pmAccount || '',
+    btn.dataset.pmCategory || ''
+  );
+}
 
 function openPM(itemId, title, accountHandle, category) {
   _pmItem = { id: itemId, title: title||'', account: accountHandle||'', category: category||'' };
