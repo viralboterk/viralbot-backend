@@ -293,6 +293,64 @@ select option{background:var(--bg2)}
 .sidebar-overlay{display:none;position:fixed;inset:0;background:rgba(26,16,53,0.3);z-index:150}
 .sidebar-overlay.open{display:block}
 #api-status{font-size:11px;font-weight:600;padding:4px 10px;background:var(--bg3);border-radius:20px;border:1px solid var(--border);color:var(--text3)}
+/* ===== PUBLISH MODAL TikTok ===== */
+.pm-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(26,16,53,0.78);backdrop-filter:blur(8px);z-index:3000;align-items:center;justify-content:center;padding:16px}
+.pm-overlay.open{display:flex!important;animation:pmFadeIn .2s ease}
+@keyframes pmFadeIn{from{opacity:0}to{opacity:1}}
+.pm-modal{background:var(--bg2);border-radius:var(--rl);border:1px solid var(--border);width:100%;max-width:500px;max-height:90vh;display:flex;flex-direction:column;box-shadow:0 32px 80px rgba(124,58,237,0.22);animation:pmSlideUp .25s ease}
+@keyframes pmSlideUp{from{transform:translateY(18px);opacity:0}to{transform:translateY(0);opacity:1}}
+.pm-header{display:flex;align-items:center;justify-content:space-between;padding:18px 22px 14px;border-bottom:1px solid var(--border);flex-shrink:0}
+.pm-tiktok-badge{width:34px;height:34px;border-radius:9px;background:linear-gradient(135deg,#FE2C55,#ff6b8a);display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;box-shadow:0 4px 14px rgba(254,44,85,0.35)}
+.pm-close-btn{width:28px;height:28px;border-radius:50%;background:var(--bg3);border:1px solid var(--border);cursor:pointer;color:var(--text2);font-size:14px;display:flex;align-items:center;justify-content:center;transition:.15s}
+.pm-close-btn:hover{background:var(--bg4);color:var(--text)}
+.pm-body{flex:1;overflow-y:auto;padding:0 22px}
+.pm-body::-webkit-scrollbar{width:4px}
+.pm-body::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+.pm-section{padding:16px 0;border-bottom:1px solid var(--border)}
+.pm-section:last-child{border-bottom:none}
+.pm-section-title{font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:var(--text3);margin-bottom:10px}
+.pm-section-subtitle{font-size:11px;color:var(--text2);margin-bottom:11px;margin-top:-6px}
+/* Textarea */
+.pm-textarea{width:100%;background:var(--bg3);border:1.5px solid var(--border);border-radius:var(--r);color:var(--text);padding:11px 13px;font-size:13px;font-family:inherit;resize:vertical;min-height:75px;max-height:140px;box-sizing:border-box;line-height:1.5;transition:border-color .18s;outline:none}
+.pm-textarea:focus{border-color:var(--purple)}
+/* Privacy cards */
+.pm-privacy-card{display:flex;align-items:center;gap:12px;padding:11px 13px;border:1.5px solid var(--border);border-radius:var(--r);cursor:pointer;transition:.15s;user-select:none}
+.pm-privacy-card:hover{border-color:var(--purple2);background:var(--purple-l)}
+.pm-privacy-card.pm-selected{border-color:var(--purple);background:var(--purple-l)}
+.pm-privacy-card.pm-card-disabled{opacity:.35;cursor:not-allowed;pointer-events:none}
+.pm-radio{width:17px;height:17px;border-radius:50%;border:2px solid var(--border2);flex-shrink:0;transition:.15s;display:flex;align-items:center;justify-content:center}
+.pm-privacy-card.pm-selected .pm-radio{border-color:var(--purple);background:var(--purple)}
+.pm-radio-dot{width:6px;height:6px;background:white;border-radius:50%;display:none}
+.pm-privacy-card.pm-selected .pm-radio-dot{display:block}
+/* Switch toggle */
+.pm-switch{position:relative;width:42px;height:24px;flex-shrink:0;cursor:pointer;display:inline-flex}
+.pm-switch input{opacity:0;width:0;height:0;position:absolute}
+.pm-switch-track{position:absolute;inset:0;background:var(--bg4);border:1px solid var(--border);border-radius:24px;transition:.2s}
+.pm-switch input:checked + .pm-switch-track{background:var(--purple);border-color:var(--purple)}
+.pm-switch-thumb{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:white;transition:.2s;box-shadow:0 1px 4px rgba(0,0,0,0.18)}
+.pm-switch input:checked ~ .pm-switch-thumb{left:21px}
+/* Interaction rows */
+.pm-interaction-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;gap:16px}
+.pm-interaction-row+.pm-interaction-row{border-top:1px solid var(--border)}
+.pm-interaction-row.pm-row-disabled{opacity:.38}
+.pm-interaction-row.pm-row-disabled .pm-switch{cursor:not-allowed;pointer-events:none}
+/* Commercial sub-panel */
+.pm-commercial-sub{margin-top:12px;padding:13px;background:var(--bg3);border-radius:var(--r);display:flex;flex-direction:column;gap:11px}
+.pm-commercial-check-row{display:flex;align-items:flex-start;gap:10px;cursor:pointer}
+.pm-commercial-check-row input[type=checkbox]{width:15px;height:15px;margin-top:2px;accent-color:var(--purple);cursor:pointer;flex-shrink:0}
+.pm-commercial-check-row+.pm-commercial-check-row{border-top:1px solid var(--border);padding-top:11px}
+/* Declaration */
+.pm-declaration-wrap{display:flex;align-items:flex-start;gap:11px;padding:13px;background:var(--purple-l);border-radius:var(--r);border:1px solid var(--border2);cursor:pointer}
+.pm-declaration-wrap input[type=checkbox]{width:15px;height:15px;margin-top:2px;accent-color:var(--purple);cursor:pointer;flex-shrink:0}
+/* Footer */
+.pm-footer{border-top:1px solid var(--border);padding:13px 22px 16px;flex-shrink:0}
+.pm-publish-btn{flex:1;background:linear-gradient(135deg,#FE2C55 0%,#d41e42 100%);color:#fff;border:none;border-radius:var(--r);padding:12px 18px;font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:all .2s;letter-spacing:.01em}
+.pm-publish-btn:not(:disabled):hover{transform:translateY(-1px);box-shadow:0 8px 28px rgba(254,44,85,0.45)}
+.pm-publish-btn:disabled{opacity:.38;cursor:not-allowed;transform:none!important;box-shadow:none!important}
+/* Success state */
+.pm-success-panel{text-align:center;padding:44px 24px;animation:pmSlideUp .3s ease}
+.pm-success-icon{font-size:52px;margin-bottom:14px;animation:pmBounce .45s ease}
+@keyframes pmBounce{0%{transform:scale(.5);opacity:0}60%{transform:scale(1.12)}100%{transform:scale(1);opacity:1}}
 </style>
 </head>
 <body>
@@ -850,7 +908,7 @@ function renderAccounts(){
         <div style="flex:1"><div class="acc-name">${a.name}</div><div class="acc-handle">${a.handle}</div></div>
         <span class="badge ${a.status==='ok'?'b-green':a.status==='warm'?'b-cyan':a.status==='warn'?'b-yellow':'b-gray'}" style="font-size:10px">${a.status==='ok'?'✅ En ligne':a.status==='warm'?'🔵 Warming':a.status==='warn'?'⚠️ Strike':'⏳ Attente'}</span>
       </div>
-      ${[['Publiées (total)',a.pubTotal.toLocaleString('fr-FR')],['Publiées aujourd\'hui',a.pubToday],['Abonnés',a.followers>0?a.followers.toLocaleString():'—'],['Vues totales',a.views],['Ancienneté',a.age]].map(([k,v])=>`<div class="acc-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('')}
+      ${[['Publiées (total)',a.pubTotal.toLocaleString('fr-FR')],['Publiées aujourd\'hui',a.pubToday],['Ancienneté',a.age]].map(([k,v])=>`<div class="acc-row"><span class="k">${k}</span><span class="v">${v}</span></div>`).join('')}
       <div style="margin-top:8px"><div class="pbar-wrap"><div class="pbar ${a.status==='warn'?'p-yellow':'p-green'}" style="width:${Math.min(100,Math.round(a.pubToday/48*100))}%"></div></div><div style="font-size:10px;color:var(--text3);margin-top:3px">${a.pubToday} / 48 aujourd'hui</div></div>
 
       <!-- CATEGORY SELECTOR -->
@@ -915,7 +973,7 @@ async function initPlanning(){
           <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${item.title||'(sans titre)'}</div>
           <div style="font-size:11px;color:var(--text2)">${cat?.icon||''} ${item.account_id} · prévu ${time}</div>
         </div>
-        <button class="btn btn-primary btn-sm" id="q-btn-${item.id}" onclick="publishNow(${item.id})">▶ Publier maintenant</button>
+        <button class="btn btn-primary btn-sm" id="q-btn-${item.id}" onclick="openPM(${item.id}, ${JSON.stringify(item.title||'')}, '${(item.account_id||'').replace(/'/g,"\\'")}', '${item.category||''}')">▶ Publier sur TikTok</button>
       </div>`;
     }).join('')}
     </div>`;
@@ -1209,7 +1267,6 @@ function loadRealAccounts() {
           pubTotal: acc.published_total || 0, pubToday: acc.published_today || 0, strikes: 0,
           status: acc.status === 'active' ? 'ok' : acc.status === 'strike' ? 'warn' : 'pending',
           age: acc.created_at ? new Date(acc.created_at).toLocaleDateString('fr-FR') : 'Nouveau',
-          followers: acc.followers || 0, views: Number(acc.total_views) ? Number(acc.total_views).toLocaleString('fr-FR') : '—',
           cat: acc.category || '',
           connected: !!acc.access_token,
         });
@@ -1513,6 +1570,448 @@ function loadTopPerformers() {
       }).join('');
     }).catch(function() {});
 }
+
+// ===== MODAL PUBLICATION TIKTOK =====
+// Données de l'item en cours de publication
+let _pmItem = { id: null, title: '', account: '', category: '' };
+
+const PM_PRIVACY_LABELS = {
+  SELF_ONLY:            { icon: '🔒', name: 'Seulement moi',    desc: 'Visible uniquement pour vous' },
+  FOLLOWER_OF_CREATOR:  { icon: '👥', name: 'Abonnés',          desc: 'Visible pour vos abonnés' },
+  MUTUAL_FOLLOW_FRIENDS:{ icon: '🤝', name: 'Amis mutuels',     desc: 'Visible pour vos amis mutuels' },
+  PUBLIC_TO_EVERYONE:   { icon: '🌍', name: 'Tout le monde',    desc: 'Visible pour tout le monde' },
+};
+
+const PM_CAT_ICONS = { movies:'🎬', stream:'🎮', sports:'⚽', divert:'😂', others:'📦' };
+
+function openPM(itemId, title, accountHandle, category) {
+  _pmItem = { id: itemId, title: title||'', account: accountHandle||'', category: category||'' };
+
+  // Reset complet
+  document.getElementById('pm-form').style.display = '';
+  document.getElementById('pm-success').style.display = 'none';
+  document.getElementById('pm-error-msg').style.display = 'none';
+  document.getElementById('pm-title-field').value = _pmItem.title;
+  document.getElementById('pm-video-title-disp').textContent = _pmItem.title || '(sans titre)';
+  document.getElementById('pm-account-badge').textContent = _pmItem.account;
+  document.getElementById('pm-cat-icon').textContent = PM_CAT_ICONS[_pmItem.category] || '📦';
+  document.getElementById('pm-comment').checked = false;
+  document.getElementById('pm-duet').checked    = false;
+  document.getElementById('pm-stitch').checked  = false;
+  document.getElementById('pm-commercial').checked      = false;
+  document.getElementById('pm-your-brand').checked      = false;
+  document.getElementById('pm-branded-content').checked = false;
+  document.getElementById('pm-music-check').checked     = false;
+  document.getElementById('pm-commercial-sub').style.display  = 'none';
+  document.getElementById('pm-commercial-msg').style.display  = 'none';
+  document.getElementById('pm-commercial-error').style.display= 'none';
+  document.getElementById('pm-branded-private-warn').style.display = 'none';
+  document.getElementById('pm-row-comment').classList.remove('pm-row-disabled');
+  document.getElementById('pm-row-duet').classList.remove('pm-row-disabled');
+  document.getElementById('pm-row-stitch').classList.remove('pm-row-disabled');
+  document.getElementById('pm-comment').disabled = false;
+  document.getElementById('pm-duet').disabled    = false;
+  document.getElementById('pm-stitch').disabled  = false;
+  pmResetDeclaration();
+  pmUpdateCharCount();
+  pmUpdateBtn();
+
+  // Affiche le modal
+  const overlay = document.getElementById('pm-overlay');
+  overlay.style.display = 'flex';
+  overlay.classList.add('open');
+  document.body.style.overflow = 'hidden';
+
+  // Charge creator_info depuis TikTok
+  pmLoadCreatorInfo(_pmItem.account);
+}
+
+function closePM() {
+  const overlay = document.getElementById('pm-overlay');
+  overlay.style.display = 'none';
+  overlay.classList.remove('open');
+  document.body.style.overflow = '';
+  _pmItem = { id: null, title: '', account: '', category: '' };
+}
+
+function pmUpdateCharCount() {
+  const val = document.getElementById('pm-title-field').value;
+  const el  = document.getElementById('pm-char-count');
+  el.textContent = val.length + ' / 2200';
+  el.style.color = val.length >= 2200 ? 'var(--red)' : val.length >= 1800 ? '#d97706' : 'var(--text3)';
+}
+
+async function pmLoadCreatorInfo(handle) {
+  const container = document.getElementById('pm-privacy-options');
+  container.innerHTML = '<div style="text-align:center;padding:18px;color:var(--text3);font-size:12px"><div class="spinner" style="margin:0 auto 8px"></div>Chargement depuis TikTok…</div>';
+  try {
+    const r = await fetch('/api/creator-info-publish?handle=' + encodeURIComponent(handle));
+    const data = await r.json();
+    if (data.error) throw new Error(data.error);
+
+    // Construit les cartes de confidentialité
+    const opts = data.privacy_level_options || ['SELF_ONLY'];
+    container.innerHTML = opts.map(opt => {
+      const lbl = PM_PRIVACY_LABELS[opt] || { icon: '❓', name: opt, desc: '' };
+      return `<div class="pm-privacy-card" id="pm-pcard-${opt}" onclick="pmSelectPrivacy('${opt}')">
+        <div class="pm-radio"><div class="pm-radio-dot"></div></div>
+        <div style="font-size:18px">${lbl.icon}</div>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text)">${lbl.name}</div>
+          <div style="font-size:11px;color:var(--text2);margin-top:1px">${lbl.desc}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    // Désactive les interactions verrouillées par les paramètres du créateur
+    if (data.comment_disabled) {
+      document.getElementById('pm-comment').disabled = true;
+      document.getElementById('pm-row-comment').classList.add('pm-row-disabled');
+    }
+    if (data.duet_disabled) {
+      document.getElementById('pm-duet').disabled = true;
+      document.getElementById('pm-row-duet').classList.add('pm-row-disabled');
+    }
+    if (data.stitch_disabled) {
+      document.getElementById('pm-stitch').disabled = true;
+      document.getElementById('pm-row-stitch').classList.add('pm-row-disabled');
+    }
+  } catch (e) {
+    container.innerHTML = '<div style="padding:12px;background:var(--red-l);border-radius:var(--r);font-size:12px;color:var(--red)">⚠️ ' + (e.message || 'Erreur réseau') + '</div>';
+  }
+}
+
+function pmSelectPrivacy(value) {
+  // Désélectionne tous
+  document.querySelectorAll('.pm-privacy-card').forEach(card => card.classList.remove('pm-selected'));
+  // Sélectionne la carte choisie
+  const card = document.getElementById('pm-pcard-' + value);
+  if (card) card.classList.add('pm-selected');
+  // Vérifie la contrainte Branded Content + SELF_ONLY
+  const brandedOn = document.getElementById('pm-branded-content').checked;
+  const warn = document.getElementById('pm-branded-private-warn');
+  if (brandedOn && value === 'SELF_ONLY') {
+    warn.style.display = 'block';
+  } else {
+    warn.style.display = 'none';
+  }
+  pmUpdateBtn();
+}
+
+function pmGetSelectedPrivacy() {
+  const sel = document.querySelector('.pm-privacy-card.pm-selected');
+  if (!sel) return null;
+  return sel.id.replace('pm-pcard-', '');
+}
+
+function pmToggleCommercial() {
+  const on  = document.getElementById('pm-commercial').checked;
+  const sub = document.getElementById('pm-commercial-sub');
+  sub.style.display = on ? 'flex' : 'none';
+  if (!on) {
+    document.getElementById('pm-your-brand').checked = false;
+    document.getElementById('pm-branded-content').checked = false;
+    document.getElementById('pm-commercial-msg').style.display   = 'none';
+    document.getElementById('pm-commercial-error').style.display = 'none';
+    document.getElementById('pm-branded-private-warn').style.display = 'none';
+    // Retire la restriction SELF_ONLY si elle était active
+    const selfCard = document.getElementById('pm-pcard-SELF_ONLY');
+    if (selfCard) selfCard.classList.remove('pm-card-disabled');
+  }
+  pmResetDeclaration();
+  pmUpdateBtn();
+}
+
+function pmUpdateCommercial() {
+  const yourBrand = document.getElementById('pm-your-brand').checked;
+  const branded   = document.getElementById('pm-branded-content').checked;
+  const msgEl     = document.getElementById('pm-commercial-msg');
+  const errEl     = document.getElementById('pm-commercial-error');
+  const warnEl    = document.getElementById('pm-branded-private-warn');
+
+  // Message informatif sur l'étiquette
+  if (yourBrand && branded) {
+    msgEl.textContent = '🏷️ Votre vidéo sera étiquetée « Partenariat payant »';
+    msgEl.style.display = 'block';
+  } else if (branded) {
+    msgEl.textContent = '🏷️ Votre vidéo sera étiquetée « Partenariat payant »';
+    msgEl.style.display = 'block';
+  } else if (yourBrand) {
+    msgEl.textContent = '🏷️ Votre vidéo sera étiquetée « Contenu promotionnel »';
+    msgEl.style.display = 'block';
+  } else {
+    msgEl.style.display = 'none';
+  }
+
+  // Erreur si aucune case cochée
+  errEl.style.display = (!yourBrand && !branded) ? 'block' : 'none';
+
+  // Contrainte : Branded Content + SELF_ONLY interdit
+  const selfCard = document.getElementById('pm-pcard-SELF_ONLY');
+  if (branded && selfCard) {
+    selfCard.classList.add('pm-card-disabled');
+    // Si SELF_ONLY était sélectionné, désélectionne
+    if (selfCard.classList.contains('pm-selected')) {
+      selfCard.classList.remove('pm-selected');
+    }
+    warnEl.style.display = 'block';
+  } else if (selfCard) {
+    selfCard.classList.remove('pm-card-disabled');
+    warnEl.style.display = 'none';
+  }
+
+  // Déclaration change si branded content actif
+  pmResetDeclaration();
+  pmUpdateBtn();
+}
+
+function pmResetDeclaration() {
+  const branded = document.getElementById('pm-branded-content').checked;
+  const textEl  = document.getElementById('pm-declaration-text');
+  if (branded) {
+    textEl.innerHTML = 'En publiant, j\'accepte la <a href="https://www.tiktok.com/legal/page/global/bc-policy/en" target="_blank" style="color:var(--purple);font-weight:600;text-decoration:none">Politique de contenu de marque</a> et la <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" style="color:var(--purple);font-weight:600;text-decoration:none">Music Usage Confirmation</a> de TikTok.';
+  } else {
+    textEl.innerHTML = 'En publiant, j\'accepte la <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" style="color:var(--purple);font-weight:600;text-decoration:none">Music Usage Confirmation</a> de TikTok.';
+  }
+}
+
+function pmUpdateBtn() {
+  const musicOk     = document.getElementById('pm-music-check').checked;
+  const privacyOk   = !!pmGetSelectedPrivacy();
+  const commercialOn = document.getElementById('pm-commercial').checked;
+  const yourBrand   = document.getElementById('pm-your-brand').checked;
+  const branded     = document.getElementById('pm-branded-content').checked;
+  const commercialOk = !commercialOn || (yourBrand || branded);
+  // Branded content + SELF_ONLY est invalide
+  const privacy = pmGetSelectedPrivacy();
+  const brandedPrivateConflict = branded && (privacy === 'SELF_ONLY');
+
+  const canPublish = musicOk && privacyOk && commercialOk && !brandedPrivateConflict;
+  const btn = document.getElementById('pm-publish-btn');
+  btn.disabled = !canPublish;
+  btn.style.opacity = canPublish ? '1' : '0.38';
+}
+
+async function submitPM() {
+  if (!_pmItem.id) return;
+  const btn     = document.getElementById('pm-publish-btn');
+  const btnTxt  = document.getElementById('pm-btn-content');
+  const errEl   = document.getElementById('pm-error-msg');
+  btn.disabled  = true;
+  btn.style.opacity = '0.6';
+  btnTxt.innerHTML = '<div class="spinner" style="width:16px;height:16px;border-width:2px;border-color:rgba(255,255,255,.3);border-top-color:#fff"></div> &nbsp;Publication en cours…';
+  errEl.style.display = 'none';
+
+  const payload = {
+    title:                document.getElementById('pm-title-field').value.trim(),
+    privacy_level:        pmGetSelectedPrivacy(),
+    disable_comment:      !document.getElementById('pm-comment').checked,
+    disable_duet:         !document.getElementById('pm-duet').checked,
+    disable_stitch:       !document.getElementById('pm-stitch').checked,
+    brand_content_toggle: document.getElementById('pm-commercial').checked,
+    brand_organic_toggle: document.getElementById('pm-your-brand').checked,
+  };
+
+  try {
+    const r    = await fetch('/api/queue/' + _pmItem.id + '/publish-manual', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await r.json();
+
+    if (data.success) {
+      // Succès : montre l'état final
+      document.getElementById('pm-form').style.display = 'none';
+      document.getElementById('pm-footer') && (document.querySelector('.pm-footer').style.display = 'none');
+      document.getElementById('pm-success').style.display = 'block';
+      // Retire la ligne du Planning
+      const row = document.getElementById('q-row-' + _pmItem.id);
+      if (row) row.remove();
+      // Ferme après 3 secondes
+      setTimeout(() => {
+        closePM();
+        notify('Vidéo publiée sur TikTok ✅', 'info');
+      }, 3200);
+    } else {
+      const msg = data.error || data.reason || 'Erreur inconnue';
+      errEl.textContent = '⚠️ ' + msg;
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.style.opacity = '1';
+      btnTxt.innerHTML = '▶ &nbsp;Publier sur TikTok';
+    }
+  } catch (e) {
+    errEl.textContent = '⚠️ Erreur réseau. Vérifiez votre connexion et réessayez.';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.style.opacity = '1';
+    btnTxt.innerHTML = '▶ &nbsp;Publier sur TikTok';
+  }
+}
 </script>
+<!-- ===== MODAL PUBLICATION TIKTOK ===== -->
+<div id="pm-overlay" class="pm-overlay" style="display:none" onclick="if(event.target===this)closePM()">
+  <div class="pm-modal">
+
+    <!-- En-tête -->
+    <div class="pm-header">
+      <div style="display:flex;align-items:center;gap:11px">
+        <div class="pm-tiktok-badge">🎵</div>
+        <div>
+          <div style="font-weight:700;font-size:15px;color:var(--text)">Publier sur TikTok</div>
+          <div id="pm-account-badge" style="font-size:11px;color:var(--text2);margin-top:1px"></div>
+        </div>
+      </div>
+      <button class="pm-close-btn" onclick="closePM()">✕</button>
+    </div>
+
+    <!-- Corps scrollable -->
+    <div class="pm-body" id="pm-form">
+
+      <!-- Aperçu vidéo -->
+      <div class="pm-section" style="display:flex;gap:13px;align-items:center">
+        <div id="pm-cat-icon" style="width:52px;height:52px;border-radius:var(--r);background:var(--bg3);display:flex;align-items:center;justify-content:center;font-size:24px;flex-shrink:0;border:1px solid var(--border)">📦</div>
+        <div style="flex:1;min-width:0">
+          <div id="pm-video-title-disp" style="font-size:13px;font-weight:600;line-height:1.4;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text)"></div>
+          <div style="font-size:11px;color:var(--text2);margin-top:4px">Vidéo sélectionnée pour publication manuelle</div>
+        </div>
+      </div>
+
+      <!-- 1 · Description / Titre -->
+      <div class="pm-section">
+        <div class="pm-section-title">📝 Description</div>
+        <textarea class="pm-textarea" id="pm-title-field" maxlength="2200" oninput="pmUpdateCharCount()" placeholder="Entrez la description de votre vidéo…"></textarea>
+        <div style="display:flex;justify-content:space-between;margin-top:5px">
+          <span style="font-size:11px;color:var(--text3)">Vous pouvez modifier le texte suggéré</span>
+          <span id="pm-char-count" style="font-size:11px;color:var(--text3)">0 / 2200</span>
+        </div>
+      </div>
+
+      <!-- 2 · Visibilité (obligatoire, sans valeur par défaut) -->
+      <div class="pm-section">
+        <div class="pm-section-title">🔒 Visibilité <span style="color:#FE2C55">*</span></div>
+        <div class="pm-section-subtitle">Sélection obligatoire — aucune valeur par défaut</div>
+        <div id="pm-privacy-options" style="display:flex;flex-direction:column;gap:8px">
+          <div style="text-align:center;padding:18px;color:var(--text3);font-size:12px">
+            <div class="spinner" style="margin:0 auto 8px"></div>Chargement depuis TikTok…
+          </div>
+        </div>
+        <div id="pm-branded-private-warn" style="display:none;margin-top:10px;padding:8px 12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;font-size:12px;color:#92400e">
+          ⚠️ Le contenu sponsorisé (Branded Content) ne peut pas être défini sur « Seulement moi ».
+        </div>
+      </div>
+
+      <!-- 3 · Interactions (toutes OFF par défaut) -->
+      <div class="pm-section">
+        <div class="pm-section-title">💬 Interactions</div>
+        <div class="pm-section-subtitle">Tout désactivé par défaut — activez manuellement si souhaité</div>
+        <div>
+          <div class="pm-interaction-row" id="pm-row-comment">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:500;color:var(--text)">Autoriser les commentaires</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:2px">Les spectateurs peuvent commenter votre vidéo</div>
+            </div>
+            <label class="pm-switch">
+              <input type="checkbox" id="pm-comment" onchange="pmUpdateBtn()">
+              <div class="pm-switch-track"></div>
+              <div class="pm-switch-thumb"></div>
+            </label>
+          </div>
+          <div class="pm-interaction-row" id="pm-row-duet">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:500;color:var(--text)">Autoriser le Duo</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:2px">Les autres peuvent créer un Duo avec votre vidéo</div>
+            </div>
+            <label class="pm-switch">
+              <input type="checkbox" id="pm-duet" onchange="pmUpdateBtn()">
+              <div class="pm-switch-track"></div>
+              <div class="pm-switch-thumb"></div>
+            </label>
+          </div>
+          <div class="pm-interaction-row" id="pm-row-stitch">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:500;color:var(--text)">Autoriser le Stitch</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:2px">Les autres peuvent intégrer votre vidéo dans les leurs</div>
+            </div>
+            <label class="pm-switch">
+              <input type="checkbox" id="pm-stitch" onchange="pmUpdateBtn()">
+              <div class="pm-switch-track"></div>
+              <div class="pm-switch-thumb"></div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4 · Contenu commercial (OFF par défaut) -->
+      <div class="pm-section">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;gap:14px">
+          <div style="flex:1">
+            <div style="font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px">📢 Déclaration de contenu commercial</div>
+            <div style="font-size:11px;color:var(--text2)">Indiquer si ce contenu fait la promotion d'une marque, d'un produit ou d'un service</div>
+          </div>
+          <label class="pm-switch" style="margin-top:2px">
+            <input type="checkbox" id="pm-commercial" onchange="pmToggleCommercial()">
+            <div class="pm-switch-track"></div>
+            <div class="pm-switch-thumb"></div>
+          </label>
+        </div>
+        <div id="pm-commercial-sub" class="pm-commercial-sub" style="display:none">
+          <label class="pm-commercial-check-row">
+            <input type="checkbox" id="pm-your-brand" onchange="pmUpdateCommercial()">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text)">Votre marque</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:2px">Vous faites la promotion de vous-même ou de votre propre entreprise. Ce contenu sera classé comme <em>Brand Organic</em>.</div>
+            </div>
+          </label>
+          <label class="pm-commercial-check-row">
+            <input type="checkbox" id="pm-branded-content" onchange="pmUpdateCommercial()">
+            <div>
+              <div style="font-size:13px;font-weight:600;color:var(--text)">Contenu sponsorisé</div>
+              <div style="font-size:11px;color:var(--text2);margin-top:2px">Vous faites la promotion d'une autre marque ou d'un tiers. Ce contenu sera classé comme <em>Branded Content</em>.</div>
+            </div>
+          </label>
+          <div id="pm-commercial-msg" style="display:none;padding:8px 12px;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;font-size:12px;color:#92400e"></div>
+          <div id="pm-commercial-error" style="display:none;font-size:12px;color:var(--text2);font-style:italic;text-align:center">ⓘ Sélectionnez au moins une option pour pouvoir publier.</div>
+        </div>
+      </div>
+
+      <!-- 5 · Déclaration Music Usage (obligatoire) -->
+      <div class="pm-section">
+        <label class="pm-declaration-wrap">
+          <input type="checkbox" id="pm-music-check" onchange="pmUpdateBtn()">
+          <div id="pm-declaration-text" style="font-size:12px;color:var(--text2);line-height:1.6">
+            En publiant, j'accepte la <a href="https://www.tiktok.com/legal/page/global/music-usage-confirmation/en" target="_blank" style="color:var(--purple);font-weight:600;text-decoration:none">Music Usage Confirmation</a> de TikTok.
+          </div>
+        </label>
+      </div>
+
+    </div><!-- /pm-body -->
+
+    <!-- Pied de page -->
+    <div class="pm-footer">
+      <div style="font-size:11px;color:var(--text3);text-align:center;margin-bottom:11px">
+        ⏱️ La vidéo peut prendre quelques minutes avant d'apparaître sur votre profil TikTok après publication.
+      </div>
+      <div id="pm-error-msg" style="display:none;padding:8px 12px;background:var(--red-l);border-radius:8px;font-size:12px;color:var(--red);text-align:center;margin-bottom:10px"></div>
+      <div style="display:flex;gap:10px">
+        <button onclick="closePM()" class="btn" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:10px 16px;font-size:13px;font-weight:500">Annuler</button>
+        <button id="pm-publish-btn" class="pm-publish-btn" onclick="submitPM()" disabled>
+          <span id="pm-btn-content">▶ &nbsp;Publier sur TikTok</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- État succès (masqué par défaut) -->
+    <div id="pm-success" style="display:none">
+      <div class="pm-success-panel">
+        <div class="pm-success-icon">✅</div>
+        <div style="font-size:20px;font-weight:700;color:var(--green);margin-bottom:8px">Publication réussie !</div>
+        <div style="font-size:13px;color:var(--text2);line-height:1.7">Votre vidéo est en cours de traitement par TikTok.<br>Elle apparaîtra sur votre profil dans quelques minutes.</div>
+      </div>
+    </div>
+
+  </div><!-- /pm-modal -->
+</div><!-- /pm-overlay -->
 </body>
 </html>

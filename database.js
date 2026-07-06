@@ -63,16 +63,11 @@ async function initDb() {
         daily_count INTEGER DEFAULT 0,
         created_at TIMESTAMPTZ DEFAULT NOW()
       );
-      -- Migration: the production accounts table already existed before the
-      -- followers column was added, so CREATE TABLE IF NOT EXISTS alone won't
-      -- add it to existing rows.
-      ALTER TABLE accounts ADD COLUMN IF NOT EXISTS followers INTEGER DEFAULT 0;
       -- Adaptive pacing: each account starts at the default 20 min interval
       -- between posts. Hitting spam_risk widens it (capped); going 3+ days
       -- without hitting it brings it back down to the default.
       ALTER TABLE accounts ADD COLUMN IF NOT EXISTS post_interval_min INTEGER DEFAULT 20;
       ALTER TABLE accounts ADD COLUMN IF NOT EXISTS last_spam_risk_at TIMESTAMPTZ;
-      ALTER TABLE accounts ADD COLUMN IF NOT EXISTS total_views BIGINT DEFAULT 0;
       -- Tracks the last successful publish per account so the queue
       -- processor can prioritize starved accounts (see processQueueInner).
       ALTER TABLE accounts ADD COLUMN IF NOT EXISTS last_published_at TIMESTAMPTZ;

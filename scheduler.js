@@ -621,35 +621,11 @@ function initScheduler() {
     }
   });
 
-  // Token refresh daily at 04:00 — also refreshes follower/view stats, but
-  // ONLY once user.info.stats/video.list scopes are actually requested again
-  // (pending TikTok app approval). Currently disabled to avoid a guaranteed
-  // 401 + noisy error log for every account, every day, for no benefit.
-  const STATS_SCOPES_APPROVED = false; // flip to true once scopes are re-added to getOAuthUrl and approved
+  // Daily heartbeat at 04:00 — was also used to refresh follower/view stats,
+  // but that feature has been dropped entirely (scopes will never be
+  // requested), so this is now just the log line.
   cron.schedule('0 4 * * *', async () => {
     logger.info('Refreshing TikTok tokens');
-    if (!STATS_SCOPES_APPROVED) return;
-    try {
-      const { getAccountInfo, getTotalViews } = require('./tiktok-publisher');
-      const accounts = await dbHelpers.getAllActiveAccounts();
-      for (const account of accounts) {
-        try {
-          const info = await getAccountInfo(account.access_token);
-          if (info && typeof info.follower_count === 'number') {
-            await dbHelpers.updateAccount(account.handle, { followers: info.follower_count });
-          }
-          const totalViews = await getTotalViews(account.access_token);
-          if (totalViews !== null) {
-            await dbHelpers.updateAccount(account.handle, { total_views: totalViews });
-          }
-        } catch (err) {
-          logger.warn('Could not refresh stats for ' + account.handle + ': ' + err.message);
-        }
-      }
-      logger.info('Account stats (followers + views) refreshed for ' + accounts.length + ' account(s)');
-    } catch (err) {
-      logger.error('Account stats refresh error: ' + err.message);
-    }
   });
 
   logger.info('✅ Scheduler initialized — all cron jobs active');

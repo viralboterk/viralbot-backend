@@ -327,35 +327,6 @@ app.get('/callback', async (req, res) => {
       [handle, tokenData.access_token, tokenData.refresh_token]
     );
     logger.info('TikTok account connected: ' + handle);
-    // Only attempt follower/views stats if TikTok's token response confirms
-    // the relevant scope was actually granted (it echoes back the granted
-    // scopes in tokenData.scope). Right now user.info.stats/video.list are
-    // not requested at all (pending TikTok app approval), so this correctly
-    // does nothing — no more guaranteed-to-fail 401 calls cluttering the logs.
-    // Once those scopes are added back to getOAuthUrl and approved, this will
-    // start working automatically with no further code change needed.
-    const grantedScope = tokenData.scope || '';
-    if (grantedScope.includes('user.info.stats') || grantedScope.includes('video.list')) {
-      try {
-        const { getAccountInfo, getTotalViews } = require('./tiktok-publisher');
-        if (grantedScope.includes('user.info.stats')) {
-          const info = await getAccountInfo(tokenData.access_token);
-          if (info && typeof info.follower_count === 'number') {
-            await dbHelpers.updateAccount(handle, { followers: info.follower_count });
-            logger.info(handle + ': ' + info.follower_count + ' abonnes recuperes');
-          }
-        }
-        if (grantedScope.includes('video.list')) {
-          const totalViews = await getTotalViews(tokenData.access_token);
-          if (totalViews !== null) {
-            await dbHelpers.updateAccount(handle, { total_views: totalViews });
-            logger.info(handle + ': ' + totalViews + ' vues totales recuperees');
-          }
-        }
-      } catch (statsErr) {
-        logger.warn('Could not fetch stats for ' + handle + ': ' + statsErr.message);
-      }
-    }
     res.send('<html><body style="font-family:sans-serif;text-align:center;padding:40px;background:#f7f5ff"><h1 style="color:#7c3aed">Compte connecte !</h1><p><strong>' + handle + '</strong> est maintenant lie a ViralBot.</p><p>Tu peux fermer cette fenetre.</p></body></html>');
   } catch (err) {
     res.send('<h2>Erreur : ' + err.message + '</h2>');
@@ -401,6 +372,106 @@ app.get('/api/queue', async (req, res) => {
 // Manual publish trigger from the dashboard. Calls the exact same
 // publishQueueItem function the cron uses every 5 minutes — this is not a
 // separate/simulated path, it runs the real download -> R2 -> TikTok pipeline.
+// Returns creator_info for the manual publish modal — tells the UI
+// which privacy levels are available, and whether any interactions
+// (comment/duet/stitch) are disabled in the creator's TikTok settings.
+app.get('/api/creator-info-publish', async (req, res) => {
+  const handle = req.query.handle;
+  if (!handle) return res.status(400).json({ error: 'handle requis' });
+  try {
+    const account = await dbHelpers.getAccountByHandle(handle);
+    if (!account || !account.access_token) return res.status(400).json({ error: 'Compte introuvable ou non connecté' });
+    const { queryCreatorInfo, refreshToken } = require('./tiktok-publisher');
+    // Refresh token first so creator_info is fetched with a valid token
+    let token = account.access_token;
+    try {
+      const refreshed = await refreshToken(account.refresh_token);
+      if (refreshed && refreshed.access_token) {
+        token = refreshed.access_token;
+        await dbHelpers.updateAccount(handle, { access_token: refreshed.access_token, refresh_token: refreshed.refresh_token || account.refresh_token });
+      }
+    } catch (_) {}
+    const info = await queryCreatorInfo(token);
+    if (!info) return res.status(503).json({ error: 'Impossible de contacter TikTok. Réessayez dans quelques secondes.' });
+    res.json({
+      privacy_level_options: info.privacy_level_options || ['SELF_ONLY'],
+      max_video_post_duration_sec: info.max_video_post_duration_sec || 3600,
+      comment_disabled: !!info.comment_disabled,
+      duet_disabled:    !!info.duet_disabled,
+      stitch_disabled:  !!info.stitch_disabled,
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Manual publish endpoint — called by the TikTok-compliant publish modal.
+// Accepts all user-specified fields (privacy, interactions, commercial content)
+// and publishes the queue item with those exact parameters.
+app.post('/api/queue/:id/publish-manual', async (req, res) => {
+  try {
+    const item = await dbHelpers.get('SELECT * FROM video_queue WHERE id = $1', [req.params.id]);
+    if (!item) return res.status(404).json({ error: 'Vidéo introuvable dans la file' });
+    if (item.status !== 'pending') return res.status(400).json({ error: `Cette vidéo a déjà le statut "${item.status}"` });
+
+    const account = await dbHelpers.getAccountByHandle(item.account_id);
+    if (!account || !account.access_token) return res.status(400).json({ error: 'Compte introuvable ou non connecté' });
+
+    const { title, privacy_level, disable_comment, disable_duet, disable_stitch, brand_content_toggle, brand_organic_toggle } = req.body;
+    if (!privacy_level) return res.status(400).json({ error: 'Veuillez sélectionner une visibilité avant de publier.' });
+
+    // Download video and upload to R2 if not already cached
+    const { downloadAndUploadToR2 } = require('./video-downloader');
+    const { publishVideo, refreshToken } = require('./tiktok-publisher');
+    const { publishQueueItem } = require('./scheduler');
+
+    // Refresh token
+    try {
+      const refreshed = await refreshToken(account.refresh_token);
+      if (refreshed && refreshed.access_token) {
+        account.access_token = refreshed.access_token;
+        if (refreshed.refresh_token) account.refresh_token = refreshed.refresh_token;
+        await dbHelpers.updateAccount(account.handle, { access_token: account.access_token, refresh_token: account.refresh_token });
+        logger.info('Token refreshed for ' + account.handle);
+      }
+    } catch (_) {}
+
+    // Download + upload to R2
+    let r2Url = item.r2_url;
+    if (!r2Url) {
+      logger.info('Manual publish: downloading ' + item.video_id + ' for ' + account.handle);
+      const downloadRes = await downloadAndUploadToR2(item.video_id, item.category);
+      r2Url = downloadRes && downloadRes.url;
+      if (!r2Url) return res.status(500).json({ error: 'Impossible de télécharger la vidéo depuis YouTube. Réessayez ou choisissez une autre vidéo.' });
+      await dbHelpers.run('UPDATE video_queue SET r2_url = $1 WHERE id = $2', [r2Url, item.id]);
+    }
+
+    // Publish with user-specified options
+    const result = await publishVideo(account, { titre: title || item.title, r2Url }, {
+      title: title || item.title,
+      privacy_level,
+      disable_comment: !!disable_comment,
+      disable_duet:    !!disable_duet,
+      disable_stitch:  !!disable_stitch,
+      brand_content_toggle: !!brand_content_toggle,
+      brand_organic_toggle: !!brand_organic_toggle,
+    });
+
+    if (result.success) {
+      await dbHelpers.markPublished(item.video_id, account.handle, item.category, title || item.title);
+      await dbHelpers.markQueueDone(item.id, 'published');
+      await dbHelpers.updateAccount(account.handle, { last_published_at: new Date().toISOString() });
+      logger.info('✅ Manual publish: ' + (title || item.title) + ' → ' + account.handle);
+      res.json({ success: true, publishId: result.publishId });
+    } else {
+      res.json({ success: false, reason: result.reason, error: result.error });
+    }
+  } catch (err) {
+    logger.error('Manual publish error: ' + err.message);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 app.post('/api/queue/:id/publish-now', async (req, res) => {
   try {
     const item = await dbHelpers.get('SELECT * FROM video_queue WHERE id = $1', [req.params.id]);

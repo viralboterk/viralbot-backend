@@ -67,7 +67,7 @@ async function queryCreatorInfo(accessToken) {
   }
 }
 
-async function publishVideo(account, videoData) {
+async function publishVideo(account, videoData, publishOptions = {}) {
   try {
     const creatorInfo = await queryCreatorInfo(account.access_token);
     if (creatorInfo) {
@@ -75,16 +75,24 @@ async function publishVideo(account, videoData) {
         JSON.stringify(creatorInfo.privacy_level_options) + ', max_video_post_duration_sec=' +
         creatorInfo.max_video_post_duration_sec);
     }
-    logger.info('Publishing with privacy_level=' + PRIVACY_LEVEL + ' for ' + account.handle);
+    // Use options from manual publish form if provided, fall back to env defaults
+    const privacyLevel = publishOptions.privacy_level || PRIVACY_LEVEL;
+    logger.info('Publishing with privacy_level=' + privacyLevel + ' for ' + account.handle);
+
+    const postInfo = {
+      title: (publishOptions.title || videoData.titre || '').substring(0, 2200),
+      privacy_level: privacyLevel,
+      disable_comment: publishOptions.disable_comment !== undefined ? !!publishOptions.disable_comment : false,
+      disable_duet:    publishOptions.disable_duet    !== undefined ? !!publishOptions.disable_duet    : false,
+      disable_stitch:  publishOptions.disable_stitch  !== undefined ? !!publishOptions.disable_stitch  : false,
+      video_cover_timestamp_ms: 1000,
+    };
+    // Commercial content disclosure fields (only sent if the user turned on the toggle)
+    if (publishOptions.brand_content_toggle) postInfo.brand_content_toggle = true;
+    if (publishOptions.brand_organic_toggle) postInfo.brand_organic_toggle = true;
+
     const initRes = await axios.post(TIKTOK_API + '/post/publish/video/init/', {
-      post_info: {
-        title: videoData.titre.substring(0, 150),
-        privacy_level: PRIVACY_LEVEL,
-        disable_duet: false,
-        disable_comment: false,
-        disable_stitch: false,
-        video_cover_timestamp_ms: 1000,
-      },
+      post_info: postInfo,
       source_info: {
         source: 'PULL_FROM_URL',
         video_url: videoData.r2Url,
@@ -154,53 +162,6 @@ async function publishVideo(account, videoData) {
   }
 }
 
-// Get account info
-async function getAccountInfo(accessToken) {
-  try {
-    const res = await axios.get(TIKTOK_API + '/user/info/', {
-      params: { fields: 'open_id,union_id,display_name,avatar_url,follower_count' },
-      headers: { 'Authorization': 'Bearer ' + accessToken }
-    });
-    return res.data.data && res.data.data.user;
-  } catch (err) {
-    logger.error('TikTok get account info error: ' + err.message);
-    return null;
-  }
-}
-
-// Sum view_count across ALL of the account's videos via /v2/video/list/,
-// paginating with the cursor TikTok returns until has_more is false.
-// Capped at 20 pages (≤ 400 videos at max_count=20) as a safety net against
-// an unexpected infinite-pagination response — well above what any of these
-// accounts will realistically have.
-async function getTotalViews(accessToken) {
-  let totalViews = 0;
-  let cursor = 0;
-  let hasMore = true;
-  let pages = 0;
-  try {
-    while (hasMore && pages < 20) {
-      const res = await axios.post(
-        TIKTOK_API + '/video/list/?fields=id,view_count',
-        { max_count: 20, cursor },
-        { headers: { 'Authorization': 'Bearer ' + accessToken, 'Content-Type': 'application/json' } }
-      );
-      const data = res.data && res.data.data;
-      if (!data || !Array.isArray(data.videos)) break;
-      for (const v of data.videos) {
-        totalViews += v.view_count || 0;
-      }
-      hasMore = !!data.has_more;
-      cursor = data.cursor;
-      pages++;
-    }
-    return totalViews;
-  } catch (err) {
-    logger.error('TikTok get video list error: ' + err.message);
-    return null; // null = couldn't fetch, caller should leave the stored value untouched
-  }
-}
-
 function sleep(ms) { return new Promise(function(r) { setTimeout(r, ms); }); }
 
-module.exports = { getOAuthUrl, exchangeCodeForToken, refreshToken, publishVideo, getAccountInfo, getTotalViews, queryCreatorInfo };
+module.exports = { getOAuthUrl, exchangeCodeForToken, refreshToken, publishVideo, queryCreatorInfo };
