@@ -85,7 +85,9 @@ async function publishVideo(account, videoData, publishOptions = {}) {
       disable_comment: publishOptions.disable_comment !== undefined ? !!publishOptions.disable_comment : false,
       disable_duet:    publishOptions.disable_duet    !== undefined ? !!publishOptions.disable_duet    : false,
       disable_stitch:  publishOptions.disable_stitch  !== undefined ? !!publishOptions.disable_stitch  : false,
-      video_cover_timestamp_ms: 1000,
+      // video_cover_timestamp_ms intentionally omitted — letting TikTok auto-select
+      // the best frame avoids grey/black thumbnails from fade-in intros that many
+      // YouTube Shorts have in their first second.
     };
     // Commercial content disclosure fields (only sent if the user turned on the toggle)
     if (publishOptions.brand_content_toggle) postInfo.brand_content_toggle = true;
